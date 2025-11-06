@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>FCRP Demo - Homewood House</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f8f9fa;
+}
+.container {
+    max-width: 800px;
+    margin: auto;
+    padding: 20px;
+}
+.card {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+.hidden {
+    display: none;
+}
+button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    background-color: #007bff;
+    color: #fff;
+    cursor: pointer;
+}
+button:hover {
+    background-color: #0056b3;
+}
+input[type=text], input[type=number] {
+    padding: 10px;
+    width: 100%;
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <!-- Landing Section -->
+    <div id="home" class="card">
+        <h2>Rebuild Hope: Homewood House</h2>
+        <img src="house.png" alt="House" style="width:100%; border-radius: 8px;">
+        <p>This 26‑year‑old woman from Homewood inherited her grandmother's home. Due to years of neglect, it has fallen into disrepair. She needs to raise $5,000 to restore it and is offering fractional ownership of her equity in the home. Join her journey to bring the house back to life.</p>
+        <p><strong>Target:</strong> $5,000 | <strong>Raised:</strong> <span id="raisedAmount">$0.00</span></p>
+        <button onclick="showSection('kyc')">Invest Now</button>
+    </div>
+    <!-- KYC Section -->
+    <div id="kyc" class="card hidden">
+        <h2>KYC Verification</h2>
+        <p>To comply with financial regulations and ensure the safety of all participants, we need to verify your identity. Please enter your details below. (This demo does not store or transmit your data.)</p>
+        <input id="name" type="text" placeholder="Full Name">
+        <input id="dob" type="text" placeholder="Date of Birth (YYYY-MM-DD)">
+        <button onclick="completeKYC()">Submit</button>
+    </div>
+    <!-- Invest Section -->
+    <div id="invest" class="card hidden">
+        <h2>Invest in Homewood House</h2>
+        <p>Enter the amount you wish to invest in the Homewood house (maximum $5,000). Your share of ownership will be calculated automatically.</p>
+        <input id="amount" type="number" placeholder="Investment Amount ($)">
+        <button onclick="submitInvestment()">Confirm Investment</button>
+    </div>
+    <!-- Wallet Section -->
+    <div id="wallet" class="card hidden">
+        <h2>Your Wallet</h2>
+        <p>Thank you for investing! Below is your fractional ownership in Homewood House.</p>
+        <p><strong>Amount Invested:</strong> $<span id="walletAmount"></span></p>
+        <p><strong>Your Ownership Share:</strong> <span id="ownershipShare"></span>%</p>
+        <p><strong>Current Property Status:</strong> <span id="propertyStatus">Dilapidated (needs reconstruction)</span></p>
+        <p>As progress is made on the renovation, your wallet will update with the latest status and share value.</p>
+        <button onclick="resetDemo()">Invest Again</button>
+    </div>
+</div>
+<script>
+function showSection(section) {
+    document.getElementById('home').classList.add('hidden');
+    document.getElementById('kyc').classList.add('hidden');
+    document.getElementById('invest').classList.add('hidden');
+    document.getElementById('wallet').classList.add('hidden');
+    document.getElementById(section).classList.remove('hidden');
+}
+function completeKYC() {
+    var name = document.getElementById('name').value;
+    var dob = document.getElementById('dob').value;
+    if (name.trim() === '' || dob.trim() === '') {
+        alert('Please enter your details.');
+        return;
+    }
+    alert('KYC verification completed for ' + name + '.');
+    showSection('invest');
+}
+function submitInvestment() {
+    var amountField = document.getElementById('amount');
+    var amount = parseFloat(amountField.value);
+    if (isNaN(amount) || amount <= 0 || amount > 5000) {
+        alert('Please enter a valid amount up to $5,000.');
+        return;
+    }
+    var share = (amount / 5000) * 100;
+    document.getElementById('walletAmount').innerText = amount.toFixed(2);
+    document.getElementById('ownershipShare').innerText = share.toFixed(2);
+    // Update raised amount display
+    var raisedText = document.getElementById('raisedAmount').innerText.replace('$','');
+    var raised = parseFloat(raisedText);
+    if (isNaN(raised)) { raised = 0; }
+    var newRaised = raised + amount;
+    document.getElementById('raisedAmount').innerText = '$' + newRaised.toFixed(2);
+    showSection('wallet');
+}
+function resetDemo() {
+    document.getElementById('name').value = '';
+    document.getElementById('dob').value = '';
+    document.getElementById('amount').value = '';
+    showSection('home');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Time Dollar Banking Demo</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f0f4f8;
+      color: #333;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      margin-top: 10px;
+    }
+    .jobs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .job-card {
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 15px;
+      flex: 1 1 calc(33% - 20px);
+      min-width: 200px;
+      position: relative;
+      cursor: pointer;
+      transition: transform 0.1s ease-in-out;
+    }
+    .job-card:hover {
+      transform: translateY(-2px);
+    }
+    .job-card.selected {
+      border: 2px solid #0070f3;
+    }
+    .job-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .job-provider {
+      font-size: 0.9em;
+      color: #555;
+    }
+    .job-card button {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      padding: 5px 10px;
+      border: none;
+      background-color: #0070f3;
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .job-card button:hover {
+      background-color: #0056b8;
+    }
+    .form-section {
+      margin-top: 30px;
+    }
+    .form-section label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    .form-section input[type="number"],
+    .form-section input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+    .form-section button {
+      padding: 8px 16px;
+      border: none;
+      background-color: #28a745;
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .form-section button:hover {
+      background-color: #218838;
+    }
+    .status {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 4px;
+      display: none;
+    }
+    .status.pending {
+      background-color: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffeeba;
+    }
+    .status.approved {
+      background-color: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .status.error {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .balance {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 10px 15px;
+      background-color: #17a2b8;
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .balance:hover {
+      background-color: #138496;
+    }
+    .spend-options {
+      margin-top: 10px;
+      display: none;
+      background-color: #fff;
+      padding: 15px;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .spend-options h3 {
+      margin-top: 0;
+    }
+    .spend-option {
+      margin-bottom: 10px;
+    }
+    .spend-option button {
+      padding: 6px 12px;
+      border: none;
+      background-color: #0070f3;
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .spend-option button:hover {
+      background-color: #0056b8;
+    }
+    .offer-form {
+      display: none;
+      margin-top: 10px;
+      background-color: #f8f9fa;
+      padding: 10px;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+    }
+    .offer-form input[type="text"] {
+      margin-bottom: 5px;
+    }
+    .message {
+      margin-top: 10px;
+      font-size: 0.9em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Time Dollar Banking Demo</h1>
+    <p>Select a volunteer activity, log your hours, and see how many time tokens you earn. Then spend your tokens or offer a new opportunity!</p>
+
+    <div class="jobs" id="jobs-list">
+      <!-- Jobs will be rendered here -->
+    </div>
+
+    <div class="form-section" id="hours-section" style="display:none;">
+      <label for="hours-input">Enter hours participated:</label>
+      <input type="number" id="hours-input" min="1" step="1" value="1" />
+      <button id="submit-hours">Submit Hours</button>
+      <div id="status-message" class="status"></div>
+    </div>
+
+    <div>
+      <div id="balance" class="balance" style="display:none;">Balance: <span id="token-count">0</span> Time Tokens</div>
+      <div id="spend-options" class="spend-options">
+        <h3>Spend Your Tokens</h3>
+        <div class="spend-option">
+          <button id="offer-service">Offer a Job/Volunteer Service</button>
+          <div id="offer-form" class="offer-form">
+            <label for="new-job-name">Job Title</label>
+            <input type="text" id="new-job-name" placeholder="e.g., Community Cleanup" />
+            <label for="new-job-provider">Provider Name</label>
+            <input type="text" id="new-job-provider" placeholder="e.g., Local NGO" />
+            <button id="add-new-job">Add Job</button>
+            <div class="message" id="offer-message"></div>
+          </div>
+        </div>
+        <div class="spend-option">
+          <button id="redeem-reinvest">Redeem for Community Reinvest Plan</button>
+        </div>
+        <div class="spend-option">
+          <button id="buy-groceries">Redeem to Buy Groceries</button>
+        </div>
+        <div class="message" id="spend-message"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  // Hard-coded list of approved jobs
+  const jobs = [
+    { id: 1, title: 'Tutoring for high school students', provider: 'Community School' },
+    { id: 2, title: 'Meal delivery to seniors', provider: 'Senior Center' },
+    { id: 3, title: 'Community gardening', provider: 'Green House' }
+  ];
+  let selectedJob = null;
+  let tokenBalance = 0;
+  let requestInProgress = false;
+
+  function renderJobs() {
+    const list = document.getElementById('jobs-list');
+    list.innerHTML = '';
+    jobs.forEach(job => {
+      const card = document.createElement('div');
+      card.className = 'job-card';
+      if (selectedJob && selectedJob.id === job.id) {
+        card.classList.add('selected');
+      }
+      const title = document.createElement('div');
+      title.className = 'job-title';
+      title.textContent = job.title;
+      const provider = document.createElement('div');
+      provider.className = 'job-provider';
+      provider.textContent = 'Provider: ' + job.provider;
+
+      card.appendChild(title);
+      card.appendChild(provider);
+
+      card.onclick = function() {
+        selectJob(job.id);
+      };
+      list.appendChild(card);
+    });
+  }
+
+  function selectJob(jobId) {
+    selectedJob = jobs.find(j => j.id === jobId);
+    renderJobs();
+    document.getElementById('hours-section').style.display = 'block';
+    const statusEl = document.getElementById('status-message');
+    statusEl.style.display = 'none';
+  }
+
+  function submitHours() {
+    const hoursInput = document.getElementById('hours-input');
+    const hours = parseInt(hoursInput.value, 10);
+    const statusEl = document.getElementById('status-message');
+    if (!selectedJob) {
+      statusEl.textContent = 'Please select a volunteer activity first.';
+      statusEl.className = 'status error';
+      statusEl.style.display = 'block';
+      return;
+    }
+    if (isNaN(hours) || hours <= 0) {
+      statusEl.textContent = 'Please enter a valid number of hours.';
+      statusEl.className = 'status error';
+      statusEl.style.display = 'block';
+      return;
+    }
+    if (requestInProgress) {
+      return;
+    }
+    requestInProgress = true;
+    statusEl.textContent = 'Awaiting approval from ' + selectedJob.provider + '...';
+    statusEl.className = 'status pending';
+    statusEl.style.display = 'block';
+    // Simulate approval
+    setTimeout(() => {
+      tokenBalance += hours;
+      updateBalanceDisplay();
+      statusEl.textContent = 'Approved! You earned ' + hours + ' time token' + (hours > 1 ? 's' : '') + '.';
+      statusEl.className = 'status approved';
+      requestInProgress = false;
+    }, 1000);
+  }
+
+  function updateBalanceDisplay() {
+    const balanceEl = document.getElementById('balance');
+    const countEl = document.getElementById('token-count');
+    countEl.textContent = tokenBalance;
+    balanceEl.style.display = 'inline-block';
+  }
+
+  function toggleSpendOptions() {
+    const options = document.getElementById('spend-options');
+    if (options.style.display === 'block') {
+      options.style.display = 'none';
+    } else {
+      options.style.display = 'block';
+      document.getElementById('spend-message').textContent = '';
+    }
+  }
+
+  function toggleOfferForm() {
+    const form = document.getElementById('offer-form');
+    form.style.display = form.style.display === 'block' ? 'none' : 'block';
+    document.getElementById('offer-message').textContent = '';
+  }
+
+  function addNewJob() {
+    const nameInput = document.getElementById('new-job-name');
+    const providerInput = document.getElementById('new-job-provider');
+    const msgEl = document.getElementById('offer-message');
+    const title = nameInput.value.trim();
+    const provider = providerInput.value.trim();
+    if (!title || !provider) {
+      msgEl.textContent = 'Please enter both job title and provider name.';
+      msgEl.style.color = '#d9534f';
+      return;
+    }
+    const newJob = {
+      id: jobs.length > 0 ? jobs[jobs.length - 1].id + 1 : 1,
+      title: title,
+      provider: provider
+    };
+    jobs.push(newJob);
+    msgEl.textContent = 'Job added successfully!';
+    msgEl.style.color = '#28a745';
+    nameInput.value = '';
+    providerInput.value = '';
+    renderJobs();
+  }
+
+  function redeem(action) {
+    const msgEl = document.getElementById('spend-message');
+    msgEl.style.color = '#d9534f';
+    if (action === 'reinvest') {
+      if (tokenBalance >= 5) {
+        tokenBalance -= 5;
+        msgEl.textContent = 'You redeemed 5 tokens for the Community Reinvest Plan.';
+        msgEl.style.color = '#28a745';
+        updateBalanceDisplay();
+      } else {
+        msgEl.textContent = 'You need at least 5 tokens to redeem for the Community Reinvest Plan.';
+      }
+    } else if (action === 'groceries') {
+      if (tokenBalance >= 3) {
+        tokenBalance -= 3;
+        msgEl.textContent = 'You redeemed 3 tokens to buy groceries.';
+        msgEl.style.color = '#28a745';
+        updateBalanceDisplay();
+      } else {
+        msgEl.textContent = 'You need at least 3 tokens to buy groceries.';
+      }
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    renderJobs();
+    document.getElementById('submit-hours').addEventListener('click', submitHours);
+    document.getElementById('balance').addEventListener('click', toggleSpendOptions);
+    document.getElementById('offer-service').addEventListener('click', toggleOfferForm);
+    document.getElementById('add-new-job').addEventListener('click', addNewJob);
+    document.getElementById('redeem-reinvest').addEventListener('click', () => redeem('reinvest'));
+    document.getElementById('buy-groceries').addEventListener('click', () => redeem('groceries'));
+  });
+</script>
+</body>
+</html>
