@@ -205,9 +205,15 @@ public fun exists_fractional_shares(shares_addr: address): bool {
 use villages_finance::admin;
 
 #[test_only]
+/// Initialize fractional shares for testing
+/// Idempotent: safe to call multiple times
 public fun initialize_for_test(admin: &signer, pool_id: u64) {
     admin::initialize_for_test(admin);
-    initialize(admin, pool_id);
+    let admin_addr = signer::address_of(admin);
+    // Check before calling initialize to prevent conflicts
+    if (!exists<FractionalShares>(admin_addr)) {
+        initialize(admin, pool_id);
+    };
 }
 
 }

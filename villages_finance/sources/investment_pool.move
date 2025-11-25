@@ -136,15 +136,18 @@ struct PoolRegistry has key {
 }
 
 /// Initialize pool registry
+/// Initialize pool registry
+/// Idempotent: safe to call multiple times
 public fun initialize(admin: &signer) {
     let admin_addr = signer::address_of(admin);
-    assert!(!exists<PoolRegistry>(admin_addr), error::already_exists(1));
-    
-    move_to(admin, PoolRegistry {
-        pools: aptos_framework::big_ordered_map::new(),
-        pool_counter: 0,
-        pool_signer_caps: aptos_framework::big_ordered_map::new(),
-    });
+    // Explicit check for idempotency - no assert, just conditional creation
+    if (!exists<PoolRegistry>(admin_addr)) {
+        move_to(admin, PoolRegistry {
+            pools: aptos_framework::big_ordered_map::new(),
+            pool_counter: 0,
+            pool_signer_caps: aptos_framework::big_ordered_map::new(),
+        });
+    };
 }
 
 /// Helper function to validate coin registration

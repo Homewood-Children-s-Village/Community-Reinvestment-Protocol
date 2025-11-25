@@ -38,10 +38,7 @@ fun test_cross_user_pool_operations(admin: signer, investor: signer) {
     compliance::whitelist_address(&admin, investor_addr);
     
     // Register coins
-    coin::register<aptos_framework::aptos_coin::AptosCoin>(&investor);
-    
-    // Initialize fractional shares
-    fractional_asset::initialize(&admin, 0);
+    coin::register<aptos_coin::AptosCoin>(&investor);
     
     // Admin creates pool (stored at admin_addr)
     let project_id = 1;

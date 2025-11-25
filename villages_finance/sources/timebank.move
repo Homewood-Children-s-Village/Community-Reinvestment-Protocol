@@ -81,14 +81,17 @@ struct RequestUpdatedEvent has drop, store {
 }
 
 /// Initialize TimeBank
+/// Initialize TimeBank
+/// Idempotent: safe to call multiple times
 public fun initialize(admin: &signer) {
     let admin_addr = signer::address_of(admin);
-    assert!(!exists<TimeBank>(admin_addr), error::already_exists(1));
-    
-    move_to(admin, TimeBank {
-        requests: aptos_framework::big_ordered_map::new(),
-        request_counter: 0,
-    });
+    // Explicit check for idempotency - no assert, just conditional creation
+    if (!exists<TimeBank>(admin_addr)) {
+        move_to(admin, TimeBank {
+            requests: aptos_framework::big_ordered_map::new(),
+            request_counter: 0,
+        });
+    };
 }
 
 /// Create a service request

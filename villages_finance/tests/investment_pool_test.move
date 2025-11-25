@@ -30,11 +30,7 @@ fun test_create_and_join_pool(admin: signer, borrower: signer, investor: signer)
     compliance::whitelist_address(&admin, investor_addr);
     
     // Register coins for investor
-    coin::register<aptos_framework::aptos_coin::AptosCoin>(&investor);
     coin::register<aptos_coin::AptosCoin>(&investor);
-    
-    // Initialize fractional shares for this pool
-    fractional_asset::initialize(&admin, 0);
     
     // Create pool
     let project_id = 1;
@@ -71,11 +67,8 @@ fun test_finalize_funding(admin: signer, borrower: signer) {
     let admin_addr = signer::address_of(&admin);
     let borrower_addr = signer::address_of(&borrower);
     
-    coin::register<aptos_framework::aptos_coin::AptosCoin>(&admin);
     coin::register<aptos_coin::AptosCoin>(&admin);
     compliance::whitelist_address(&admin, admin_addr);
-    
-    fractional_asset::initialize(&admin, 0);
     
     investment_pool::create_pool(&admin, 1, 5000, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
     
@@ -101,10 +94,7 @@ fun test_repay_loan(admin: signer, borrower: signer) {
     let admin_addr = signer::address_of(&admin);
     let borrower_addr = signer::address_of(&borrower);
     
-    coin::register<aptos_framework::aptos_coin::AptosCoin>(&borrower);
     coin::register<aptos_coin::AptosCoin>(&borrower);
-    
-    fractional_asset::initialize(&admin, 0);
     
     investment_pool::create_pool(&admin, 1, 5000, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
     
@@ -128,8 +118,6 @@ fun test_mark_defaulted(admin: signer) {
     
     let admin_addr = signer::address_of(&admin);
     
-    fractional_asset::initialize(&admin, 0);
-    
     investment_pool::create_pool(&admin, 1, 5000, 500, 86400, @0x999, admin_addr, admin_addr, admin_addr, admin_addr);
     
     investment_pool::mark_defaulted(&admin, 0, admin_addr);
@@ -152,13 +140,9 @@ fun test_repayment_rounding_all_funds_claimable(admin: signer, borrower: signer,
     let investor2_addr = signer::address_of(&investor2);
     
     // Register coins
-    coin::register<aptos_framework::aptos_coin::AptosCoin>(&admin);
     coin::register<aptos_coin::AptosCoin>(&admin);
-    coin::register<aptos_framework::aptos_coin::AptosCoin>(&borrower);
     coin::register<aptos_coin::AptosCoin>(&borrower);
-    coin::register<aptos_framework::aptos_coin::AptosCoin>(&investor1);
     coin::register<aptos_coin::AptosCoin>(&investor1);
-    coin::register<aptos_framework::aptos_coin::AptosCoin>(&investor2);
     coin::register<aptos_coin::AptosCoin>(&investor2);
     
     // Register and whitelist investors
@@ -168,8 +152,6 @@ fun test_repayment_rounding_all_funds_claimable(admin: signer, borrower: signer,
     members::accept_membership(&investor2, admin_addr);
     compliance::whitelist_address(&admin, investor1_addr);
     compliance::whitelist_address(&admin, investor2_addr);
-    
-    fractional_asset::initialize(&admin, 0);
     
     // Create pool with target 1000
     let target_amount = 1000;

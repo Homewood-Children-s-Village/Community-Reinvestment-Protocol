@@ -69,14 +69,17 @@ struct ProjectStatusUpdatedEvent has drop, store {
 }
 
 /// Initialize project registry
+/// Initialize project registry
+/// Idempotent: safe to call multiple times
 public fun initialize(admin: &signer) {
     let admin_addr = signer::address_of(admin);
-    assert!(!exists<ProjectRegistry>(admin_addr), error::already_exists(1));
-    
-    move_to(admin, ProjectRegistry {
-        projects: aptos_framework::big_ordered_map::new(),
-        project_counter: 0,
-    });
+    // Explicit check for idempotency - no assert, just conditional creation
+    if (!exists<ProjectRegistry>(admin_addr)) {
+        move_to(admin, ProjectRegistry {
+            projects: aptos_framework::big_ordered_map::new(),
+            project_counter: 0,
+        });
+    };
 }
 
 /// Propose a new project

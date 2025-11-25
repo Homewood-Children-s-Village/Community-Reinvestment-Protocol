@@ -345,14 +345,17 @@ public entry fun vote(
         error::not_found(E_PROPOSAL_NOT_FOUND));
     
     let proposal = aptos_framework::ordered_map::borrow_mut(&mut governance.proposals, &proposal_id);
+    
+    // CHECK DUPLICATE VOTE FIRST (before status check) - ensures correct error code
+    assert!(!aptos_framework::big_ordered_map::contains(&proposal.voters, &voter_addr), 
+        error::already_exists(E_ALREADY_VOTED));
+    
+    // THEN check status
     assert!(proposal.status is ProposalStatus::Active, error::invalid_state(E_INVALID_STATUS));
     
     // Check voter is a member
     assert!(members::is_member_with_registry(voter_addr, proposal.members_registry_addr), 
         error::permission_denied(E_NOT_MEMBER));
-    
-    assert!(!aptos_framework::big_ordered_map::contains(&proposal.voters, &voter_addr), 
-        error::already_exists(E_ALREADY_VOTED));
     
     // Calculate voting power based on mechanism
     let voting_power = calculate_voting_power(voter_addr, proposal.voting_mechanism, proposal.token_admin_addr);
