@@ -141,11 +141,11 @@ public fun initialize(
 /// Create a resource account for module deployment (admin/governance only)
 /// This creates a resource account and stores its signer capability for future upgrades
 public entry fun create_resource_account_for_deployment(
-    admin: signer,
+    admin: &signer,
     seed: vector<u8>,
     gov_addr: address,
 ) acquires Governance {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     
     // Validate registry exists
     assert!(exists<Governance>(gov_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -159,7 +159,7 @@ public entry fun create_resource_account_for_deployment(
     assert!(option::is_none(&governance.resource_account_signer), error::already_exists(1));
     
     // Create resource account
-    let (resource_signer, resource_signer_cap) = account::create_resource_account(&admin, seed);
+    let (resource_signer, resource_signer_cap) = account::create_resource_account(admin, seed);
     let resource_addr = signer::address_of(&resource_signer);
     
     // Store the signer capability and address for future upgrades
@@ -197,7 +197,7 @@ fun store_resource_account_signer_internal(
 
 /// Create a governance proposal
 public entry fun create_proposal(
-    proposer: signer,
+    proposer: &signer,
     gov_addr: address,
     title: vector<u8>,
     description: vector<u8>,
@@ -208,7 +208,7 @@ public entry fun create_proposal(
     members_registry_addr: address,
     token_admin_addr: address,
 ) acquires Governance {
-    let proposer_addr = signer::address_of(&proposer);
+    let proposer_addr = signer::address_of(proposer);
     
     // Validate registry exists
     assert!(exists<Governance>(gov_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -267,11 +267,11 @@ public entry fun create_proposal(
 
 /// Activate a proposal (moves from Pending to Active)
 public entry fun activate_proposal(
-    admin: signer,
+    admin: &signer,
     proposal_id: u64,
     gov_addr: address,
 ) acquires Governance {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     
     // Validate registry exists
     assert!(exists<Governance>(gov_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -330,12 +330,12 @@ fun integer_square_root(n: u64): u64 {
 
 /// Cast a vote on a proposal
 public entry fun vote(
-    voter: signer,
+    voter: &signer,
     proposal_id: u64,
     choice: u8,
     gov_addr: address,
 ) acquires Governance {
-    let voter_addr = signer::address_of(&voter);
+    let voter_addr = signer::address_of(voter);
     
     // Validate registry exists
     assert!(exists<Governance>(gov_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -428,11 +428,11 @@ fun execute_action(
 
 /// Execute an approved proposal
 public entry fun execute_proposal(
-    executor: signer,
+    executor: &signer,
     proposal_id: u64,
     gov_addr: address,
 ) acquires Governance {
-    let executor_addr = signer::address_of(&executor);
+    let executor_addr = signer::address_of(executor);
     
     // Validate registry exists
     assert!(exists<Governance>(gov_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -447,7 +447,7 @@ public entry fun execute_proposal(
     // Execute proposal action if present
     if (option::is_some(&proposal.action)) {
         let action = option::borrow(&proposal.action);
-        execute_action(&executor, action, gov_addr);
+        execute_action(executor, action, gov_addr);
     };
     
     proposal.status = ProposalStatus::Executed;
@@ -460,12 +460,12 @@ public entry fun execute_proposal(
 
 /// Upgrade module using resource account signer capability
 public entry fun upgrade_module(
-    executor: signer,
+    executor: &signer,
     proposal_id: u64,
     module_name: vector<u8>,
     gov_addr: address,
 ) acquires Governance {
-    let executor_addr = signer::address_of(&executor);
+    let executor_addr = signer::address_of(executor);
     
     // Validate registry exists
     assert!(exists<Governance>(gov_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -686,9 +686,6 @@ fun decode_action(action_type: u8, data: vector<u8>): option::Option<ProposalAct
         option::none<ProposalAction>()
     }
 }
-
-#[test_only]
-use villages_finance::admin;
 
 #[test_only]
 public fun initialize_for_test(admin: &signer, members_registry_addr: address, token_admin_addr: address) {

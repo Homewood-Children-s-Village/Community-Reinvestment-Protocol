@@ -81,7 +81,7 @@ public fun initialize(admin: &signer) {
 
 /// Propose a new project
 public entry fun propose_project(
-    proposer: signer,
+    proposer: &signer,
     metadata_cid: vector<u8>,
     target_usdc: u64,
     target_hours: u64,
@@ -89,7 +89,7 @@ public entry fun propose_project(
     registry_addr: address,
     members_registry_addr: address,
 ) acquires ProjectRegistry {
-    let proposer_addr = signer::address_of(&proposer);
+    let proposer_addr = signer::address_of(proposer);
     
     // Validate registries
     assert!(exists<ProjectRegistry>(registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -129,11 +129,11 @@ public entry fun propose_project(
 
 /// Approve a project (governance/admin only)
 public entry fun approve_project(
-    approver: signer,
+    approver: &signer,
     project_id: u64,
     registry_addr: address,
 ) acquires ProjectRegistry {
-    let approver_addr = signer::address_of(&approver);
+    let approver_addr = signer::address_of(approver);
     
     // Verify admin role
     assert!(admin::has_admin_capability(approver_addr), error::permission_denied(E_NOT_ADMIN));
@@ -158,12 +158,12 @@ public entry fun approve_project(
 
 /// Update project status (admin only)
 public entry fun update_status(
-    admin: signer,
+    admin: &signer,
     project_id: u64,
     new_status: u8,
     registry_addr: address,
 ) acquires ProjectRegistry {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     
     // Verify admin role
     assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_ADMIN));
@@ -323,9 +323,6 @@ fun status_from_u8(status: u8): ProjectStatus {
         abort error::invalid_argument(E_INVALID_STATUS)
     }
 }
-
-#[test_only]
-use villages_finance::admin;
 
 #[test_only]
 public fun initialize_for_test(admin: &signer) {

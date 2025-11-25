@@ -1,5 +1,5 @@
 #[test_only]
-module villages_finance::compliance_test;
+module villages_finance::compliance_test {
 
 use villages_finance::compliance;
 use std::signer;
@@ -69,5 +69,7 @@ fun test_get_whitelist_count(admin: signer) {
     compliance::remove_from_whitelist(&admin, @0x100);
     // Count doesn't decrease on removal (as per current implementation)
     // This could be changed if needed
+}
+
 }
 

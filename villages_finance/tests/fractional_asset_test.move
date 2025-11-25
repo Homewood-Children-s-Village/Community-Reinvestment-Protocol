@@ -1,5 +1,5 @@
 #[test_only]
-module villages_finance::fractional_asset_test;
+module villages_finance::fractional_asset_test {
 
 use villages_finance::fractional_asset;
 use villages_finance::admin;
@@ -63,5 +63,7 @@ fun test_transfer_shares(admin: signer, user1: signer) {
     
     let user1_shares = fractional_asset::get_shares(user1_addr, pool_id, shares_addr);
     assert!(user1_shares == 40, 1);
+}
+
 }
 

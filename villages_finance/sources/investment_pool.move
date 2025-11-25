@@ -159,7 +159,7 @@ fun validate_coin_registration(addr: address): bool {
 
 /// Create a new investment pool
 public entry fun create_pool(
-    admin: signer,
+    admin: &signer,
     project_id: u64,
     target_amount: u64,
     interest_rate: u64,
@@ -170,7 +170,7 @@ public entry fun create_pool(
     compliance_registry_addr: address,
     members_registry_addr: address,
 ) acquires PoolRegistry {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     
     // Verify admin role
     assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_ADMIN));
@@ -195,7 +195,7 @@ public entry fun create_pool(
     
     // Initialize if needed
     if (!exists<PoolRegistry>(admin_addr)) {
-        move_to(&admin, PoolRegistry {
+        move_to(admin, PoolRegistry {
             pools: aptos_framework::big_ordered_map::new(),
             pool_counter: 0,
             pool_signer_caps: aptos_framework::big_ordered_map::new(),
@@ -244,7 +244,7 @@ public entry fun create_pool(
 /// Create a pool from an approved project
 /// Reads project details and creates pool with project's target amounts
 public entry fun create_pool_from_project(
-    admin: signer,
+    admin: &signer,
     project_id: u64,
     interest_rate: u64,
     duration: u64,
@@ -255,7 +255,7 @@ public entry fun create_pool_from_project(
     project_registry_addr: address,
     pool_registry_addr: address,
 ) acquires PoolRegistry {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     
     // Verify admin role
     assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_ADMIN));
@@ -290,7 +290,7 @@ public entry fun create_pool_from_project(
     
     // Initialize pool registry if needed
     if (!exists<PoolRegistry>(pool_registry_addr)) {
-        move_to(&admin, PoolRegistry {
+        move_to(admin, PoolRegistry {
             pools: aptos_framework::big_ordered_map::new(),
             pool_counter: 0,
             pool_signer_caps: aptos_framework::big_ordered_map::new(),
@@ -337,7 +337,7 @@ public entry fun create_pool_from_project(
 
 /// Join a pool (invest in it)
 public entry fun join_pool(
-    investor: signer,
+    investor: &signer,
     pool_id: u64,
     amount: u64,
     registry_addr: address,
@@ -347,7 +347,7 @@ public entry fun join_pool(
     // Validate registry exists
     assert!(exists<PoolRegistry>(registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
     
-    let investor_addr = signer::address_of(&investor);
+    let investor_addr = signer::address_of(investor);
     
     assert!(exists<PoolRegistry>(registry_addr), error::not_found(E_NOT_INITIALIZED));
     let registry = borrow_global_mut<PoolRegistry>(registry_addr);
@@ -375,7 +375,7 @@ public entry fun join_pool(
     assert!(balance >= amount, error::invalid_state(E_INSUFFICIENT_BALANCE));
     
     // Transfer coins to pool address
-    let coins = coin::withdraw<aptos_coin::AptosCoin>(&investor, amount);
+    let coins = coin::withdraw<aptos_coin::AptosCoin>(investor, amount);
     coin::deposit(pool.pool_address, coins);
     
     // Update contribution
@@ -390,7 +390,7 @@ public entry fun join_pool(
     pool.status = PoolStatus::Active;
     
     // Mint fractional shares
-    fractional_asset::mint_shares(&investor, pool_id, investor_addr, amount, pool.fractional_shares_addr);
+    fractional_asset::mint_shares(investor, pool_id, investor_addr, amount, pool.fractional_shares_addr);
 
     event::emit(InvestmentCommittedEvent {
         pool_id,
@@ -413,11 +413,11 @@ public entry fun join_pool(
 
 /// Finalize funding when goal is met
 public entry fun finalize_funding(
-    admin: signer,
+    admin: &signer,
     pool_id: u64,
     registry_addr: address,
 ) acquires PoolRegistry {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     
     // Verify admin role
     assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_ADMIN));
@@ -449,7 +449,7 @@ public entry fun finalize_funding(
     // If pool_address is registry_addr, use admin signer; otherwise requires resource account signer
     // For MVP: assume pool_address == registry_addr
     if (pool.pool_address == registry_addr) {
-        let coins = coin::withdraw<aptos_coin::AptosCoin>(&admin, total_funds);
+        let coins = coin::withdraw<aptos_coin::AptosCoin>(admin, total_funds);
         coin::deposit(pool.borrower, coins);
     } else {
         // TODO: Extract resource account signer capability from registry
@@ -467,11 +467,11 @@ public entry fun finalize_funding(
 
 /// Repay loan with interest
 public entry fun repay_loan(
-    borrower: signer,
+    borrower: &signer,
     pool_id: u64,
     registry_addr: address,
 ) acquires PoolRegistry {
-    let borrower_addr = signer::address_of(&borrower);
+    let borrower_addr = signer::address_of(borrower);
     
     // Validate registry exists
     assert!(exists<PoolRegistry>(registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -496,7 +496,7 @@ public entry fun repay_loan(
     assert!(borrower_balance >= total_owed, error::invalid_state(E_INSUFFICIENT_BALANCE));
     
     // Transfer repayment + interest to pool address
-    let repayment_coins = coin::withdraw<aptos_coin::AptosCoin>(&borrower, total_owed);
+    let repayment_coins = coin::withdraw<aptos_coin::AptosCoin>(borrower, total_owed);
     coin::deposit(pool.pool_address, repayment_coins);
     
     // Store total repayment amount - investors can claim their share
@@ -514,12 +514,12 @@ public entry fun repay_loan(
 /// Note: For MVP, requires admin signer to withdraw from pool_address
 /// In production: Would use resource account signer capability
 public entry fun bulk_claim_repayments(
-    investor: signer,
-    admin: signer,
+    investor: &signer,
+    admin: &signer,
     pool_ids: vector<u64>,
     registry_addr: address,
 ) acquires PoolRegistry {
-    let investor_addr = signer::address_of(&investor);
+    let investor_addr = signer::address_of(investor);
     
     // Validate registry exists
     assert!(exists<PoolRegistry>(registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -564,9 +564,9 @@ public entry fun bulk_claim_repayments(
                             if (pool_balance >= final_share) {
                                 // Transfer coins - for MVP: pool_address must equal registry_addr
                                 assert!(pool.pool_address == registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
-                                let admin_addr = signer::address_of(&admin);
+                                let admin_addr = signer::address_of(admin);
                                 assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
-                                let coins = coin::withdraw<aptos_coin::AptosCoin>(&admin, final_share);
+                                let coins = coin::withdraw<aptos_coin::AptosCoin>(admin, final_share);
                                 coin::deposit(investor_addr, coins);
                                 
                                 // Update total claimed
@@ -621,12 +621,12 @@ public entry fun bulk_claim_repayments(
 /// Note: For MVP, requires admin signer to withdraw from pool_address
 /// In production: Would use resource account signer capability
 public entry fun claim_repayment(
-    investor: signer,
-    admin: signer,
+    investor: &signer,
+    admin: &signer,
     pool_id: u64,
     registry_addr: address,
 ) acquires PoolRegistry {
-    let investor_addr = signer::address_of(&investor);
+    let investor_addr = signer::address_of(investor);
     
     // Validate registry exists
     assert!(exists<PoolRegistry>(registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -672,9 +672,9 @@ public entry fun claim_repayment(
     // Transfer share to investor
     // For MVP: pool_address must equal registry_addr to use admin signer
     assert!(pool.pool_address == registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
-    let coins = coin::withdraw<aptos_coin::AptosCoin>(&admin, final_share);
+    let coins = coin::withdraw<aptos_coin::AptosCoin>(admin, final_share);
     coin::deposit(investor_addr, coins);
     
     // Update total claimed
@@ -692,11 +692,11 @@ public entry fun claim_repayment(
 
 /// Mark pool as defaulted
 public entry fun mark_defaulted(
-    admin: signer,
+    admin: &signer,
     pool_id: u64,
     registry_addr: address,
 ) acquires PoolRegistry {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     
     // Verify admin role
     assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_ADMIN));
@@ -936,9 +936,6 @@ fun status_to_u8(status: PoolStatus): u8 {
         PoolStatus::Defaulted => 4,
     }
 }
-
-#[test_only]
-use villages_finance::admin;
 
 #[test_only]
 public fun initialize_for_test(admin: &signer) {

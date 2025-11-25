@@ -1,5 +1,5 @@
 #[test_only]
-module villages_finance::governance_test;
+module villages_finance::governance_test {
 
 use villages_finance::governance;
 use villages_finance::admin;
@@ -23,7 +23,7 @@ fun test_create_and_vote_simple(admin: signer, voter1: signer, voter2: signer) {
     // Initialize token
     let name = string::utf8(b"Test Token");
     let symbol = string::utf8(b"TEST");
-    let (_, _) = token::initialize_for_test(&admin, name, symbol);
+    let _metadata = token::initialize_for_test(&admin, name, symbol);
     
     // Initialize governance
     governance::initialize_for_test(&admin, admin_addr, admin_addr);
@@ -64,7 +64,7 @@ fun test_execute_proposal(admin: signer, voter1: signer) {
     
     let name = string::utf8(b"Test Token");
     let symbol = string::utf8(b"TEST");
-    let (_, _) = token::initialize_for_test(&admin, name, symbol);
+    let _metadata = token::initialize_for_test(&admin, name, symbol);
     
     governance::initialize_for_test(&admin, admin_addr, admin_addr);
     
@@ -93,7 +93,7 @@ fun test_double_vote(admin: signer, voter1: signer) {
     
     let name = string::utf8(b"Test Token");
     let symbol = string::utf8(b"TEST");
-    let (_, _) = token::initialize_for_test(&admin, name, symbol);
+    let _metadata = token::initialize_for_test(&admin, name, symbol);
     
     governance::initialize_for_test(&admin, admin_addr, admin_addr);
     
@@ -118,7 +118,7 @@ fun test_vote_requires_membership(admin: signer, voter1: signer) {
     
     let name = string::utf8(b"Test Token");
     let symbol = string::utf8(b"TEST");
-    let (_, _) = token::initialize_for_test(&admin, name, symbol);
+    let _metadata = token::initialize_for_test(&admin, name, symbol);
     
     governance::initialize_for_test(&admin, admin_addr, admin_addr);
     
@@ -129,5 +129,7 @@ fun test_vote_requires_membership(admin: signer, voter1: signer) {
     
     governance::activate_proposal(&admin, 0, gov_addr);
     governance::vote(&voter1, 0, 0, gov_addr); // Should fail - not a member
+}
+
 }
 

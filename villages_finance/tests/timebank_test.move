@@ -1,5 +1,5 @@
 #[test_only]
-module villages_finance::timebank_test;
+module villages_finance::timebank_test {
 
 use villages_finance::timebank;
 use villages_finance::admin;
@@ -52,7 +52,7 @@ fun test_approve_request(admin: signer, user1: signer) {
     members::initialize_for_test(&admin);
     compliance::initialize_for_test(&admin);
     timebank::initialize_for_test(&admin);
-    let (metadata, mint_cap) = time_token::initialize_for_test(&admin);
+    let metadata = time_token::initialize_for_test(&admin);
     let admin_addr = signer::address_of(&admin);
     let user1_addr = signer::address_of(&user1);
     
@@ -111,4 +111,6 @@ fun test_create_request_requires_membership(admin: signer, user1: signer) {
     
     // user1 is NOT registered as member - should fail
     timebank::create_request(&user1, 5, 1, admin_addr, bank_registry_addr);
+}
+
 }

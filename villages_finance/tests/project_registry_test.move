@@ -1,5 +1,5 @@
 #[test_only]
-module villages_finance::project_registry_test;
+module villages_finance::project_registry_test {
 
 use villages_finance::project_registry;
 use villages_finance::admin;
@@ -24,7 +24,7 @@ fun test_propose_project(admin: signer, user1: signer) {
     let target_hours = 100;
     let is_grant = false;
     
-    project_registry::propose_project(&user1, metadata_cid, target_usdc, target_hours, is_grant, admin_addr, admin_addr);
+    project_registry::propose_project(&user1, *string::bytes(&metadata_cid), target_usdc, target_hours, is_grant, admin_addr, admin_addr);
     
     // Check project was created
     let (proposer, cid, usdc, hours, grant, status, _) = project_registry::get_project(0, admin_addr);
@@ -43,7 +43,7 @@ fun test_approve_project(admin: signer) {
     let admin_addr = signer::address_of(&admin);
     
     let metadata_cid = string::utf8(b"QmTest123");
-    project_registry::propose_project(&admin, metadata_cid, 5000, 100, false, admin_addr, admin_addr);
+    project_registry::propose_project(&admin, *string::bytes(&metadata_cid), 5000, 100, false, admin_addr, admin_addr);
     
     project_registry::approve_project(&admin, 0, admin_addr);
     
@@ -59,7 +59,7 @@ fun test_update_status(admin: signer) {
     let admin_addr = signer::address_of(&admin);
     
     let metadata_cid = string::utf8(b"QmTest123");
-    project_registry::propose_project(&admin, metadata_cid, 5000, 100, false, admin_addr, admin_addr);
+    project_registry::propose_project(&admin, *string::bytes(&metadata_cid), 5000, 100, false, admin_addr, admin_addr);
     
     project_registry::update_status(&admin, 0, 2, admin_addr); // Set to Active
     let (_, _, _, _, _, status, _) = project_registry::get_project(0, admin_addr);
@@ -68,5 +68,7 @@ fun test_update_status(admin: signer) {
     project_registry::update_status(&admin, 0, 3, admin_addr); // Set to Completed
     let (_, _, _, _, _, status, _) = project_registry::get_project(0, admin_addr);
     assert!(status == 3, 1);
+}
+
 }
 

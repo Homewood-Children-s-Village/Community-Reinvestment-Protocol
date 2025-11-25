@@ -71,7 +71,7 @@ public fun initialize(admin: &signer) {
 
 /// Deposit Aptos Coins to treasury
 public entry fun deposit(
-    depositor: signer,
+    depositor: &signer,
     amount: u64,
     treasury_addr: address,
     members_registry_addr: address,
@@ -79,7 +79,7 @@ public entry fun deposit(
 ) acquires Treasury {
     assert!(amount > 0, error::invalid_argument(E_ZERO_AMOUNT));
     
-    let depositor_addr = signer::address_of(&depositor);
+    let depositor_addr = signer::address_of(depositor);
     
     // Validate registries
     assert!(exists<Treasury>(treasury_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -102,7 +102,7 @@ public entry fun deposit(
     let treasury = borrow_global_mut<Treasury>(treasury_addr);
     
     // Transfer coins from depositor to treasury address
-    let coins = coin::withdraw<aptos_framework::aptos_coin::AptosCoin>(&depositor, amount);
+    let coins = coin::withdraw<aptos_framework::aptos_coin::AptosCoin>(depositor, amount);
     coin::deposit(treasury_addr, coins); // Hold in treasury account
     
         // Update balance
@@ -139,14 +139,14 @@ public entry fun deposit(
 /// Note: For MVP, requires admin signer to withdraw from treasury_addr
 /// In production: Would use resource account signer capability
 public entry fun withdraw(
-    withdrawer: signer,
-    admin: signer,
+    withdrawer: &signer,
+    admin: &signer,
     amount: u64,
     treasury_addr: address,
 ) acquires Treasury {
     assert!(amount > 0, error::invalid_argument(E_ZERO_AMOUNT));
     
-    let withdrawer_addr = signer::address_of(&withdrawer);
+    let withdrawer_addr = signer::address_of(withdrawer);
     
     // Validate registry
     assert!(exists<Treasury>(treasury_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -166,10 +166,10 @@ public entry fun withdraw(
     
     // Transfer coins back from treasury to withdrawer
     // For MVP: treasury_addr must equal admin address to use admin signer
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     assert!(treasury_addr == admin_addr, error::invalid_argument(E_INVALID_REGISTRY));
     assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
-    let coins = coin::withdraw<aptos_framework::aptos_coin::AptosCoin>(&admin, amount);
+    let coins = coin::withdraw<aptos_framework::aptos_coin::AptosCoin>(admin, amount);
     coin::deposit(withdrawer_addr, coins);
 
     event::emit(WithdrawalEvent {
@@ -192,7 +192,7 @@ public entry fun withdraw(
 
 /// Transfer funds to an investment pool
 public entry fun transfer_to_pool(
-    from: signer,
+    from: &signer,
     pool_id: u64,
     amount: u64,
     pool_address: address,
@@ -200,7 +200,7 @@ public entry fun transfer_to_pool(
 ) acquires Treasury {
     assert!(amount > 0, error::invalid_argument(E_ZERO_AMOUNT));
     
-    let from_addr = signer::address_of(&from);
+    let from_addr = signer::address_of(from);
     
     // Validate registry
     assert!(exists<Treasury>(treasury_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -222,7 +222,7 @@ public entry fun transfer_to_pool(
     // For MVP: treasury_addr must equal from address to use from signer
     assert!(treasury_addr == from_addr, error::invalid_argument(E_INVALID_REGISTRY));
     // Note: In production, would validate admin or use resource account
-    let coins = coin::withdraw<aptos_framework::aptos_coin::AptosCoin>(&from, amount);
+    let coins = coin::withdraw<aptos_framework::aptos_coin::AptosCoin>(from, amount);
     coin::deposit(pool_address, coins);
     
     event::emit(TransferToPoolEvent {

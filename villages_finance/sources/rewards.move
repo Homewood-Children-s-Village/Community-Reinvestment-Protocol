@@ -98,14 +98,14 @@ public fun initialize(
 
 /// Distribute rewards to the pool
 public entry fun distribute_rewards(
-    distributor: signer,
+    distributor: &signer,
     pool_id: u64,
     total_amount: u64,
     pool_registry_addr: address,
 ) acquires RewardsPool {
     assert!(total_amount > 0, error::invalid_argument(E_ZERO_AMOUNT));
     
-    let distributor_addr = signer::address_of(&distributor);
+    let distributor_addr = signer::address_of(distributor);
     
     // Validate registry exists
     assert!(exists<RewardsPool>(pool_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -114,7 +114,7 @@ public entry fun distribute_rewards(
     
     // Transfer coins to pool address
     // For MVP: pool_address equals pool_registry_addr, so we can deposit directly
-    let coins = coin::withdraw<aptos_coin::AptosCoin>(&distributor, total_amount);
+    let coins = coin::withdraw<aptos_coin::AptosCoin>(distributor, total_amount);
     coin::deposit(pool.pool_address, coins);
     
     // Update cumulative reward index
@@ -193,12 +193,12 @@ fun calculate_pending_rewards(
 /// Note: For MVP, requires admin signer to withdraw from pool_address
 /// In production: Would use resource account signer capability
 public entry fun claim_rewards(
-    claimer: signer,
-    admin: signer,
+    claimer: &signer,
+    admin: &signer,
     pool_id: u64,
     pool_registry_addr: address,
 ) acquires RewardsPool {
-    let claimer_addr = signer::address_of(&claimer);
+    let claimer_addr = signer::address_of(claimer);
     
     // Validate registry exists
     assert!(exists<RewardsPool>(pool_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -219,10 +219,10 @@ public entry fun claim_rewards(
     
     // Transfer coins to claimer
     // For MVP: pool_address must equal pool_registry_addr to use admin signer
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     assert!(pool.pool_address == pool_registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
     assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
-    let coins = coin::withdraw<aptos_coin::AptosCoin>(&admin, amount);
+    let coins = coin::withdraw<aptos_coin::AptosCoin>(admin, amount);
     coin::deposit(claimer_addr, coins);
     
     data.pending_rewards = 0;
@@ -248,14 +248,14 @@ public entry fun claim_rewards(
 
 /// Stake tokens in the rewards pool
 public entry fun stake(
-    staker: signer,
+    staker: &signer,
     pool_id: u64,
     amount: u64,
     pool_registry_addr: address,
 ) acquires RewardsPool {
     assert!(amount > 0, error::invalid_argument(E_ZERO_AMOUNT));
     
-    let staker_addr = signer::address_of(&staker);
+    let staker_addr = signer::address_of(staker);
     
     // Validate registry exists
     assert!(exists<RewardsPool>(pool_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -300,7 +300,7 @@ public entry fun stake(
     pool.total_staked = pool.total_staked + amount;
     
     // Transfer coins to pool (staking)
-    let coins = coin::withdraw<aptos_coin::AptosCoin>(&staker, amount);
+    let coins = coin::withdraw<aptos_coin::AptosCoin>(staker, amount);
     coin::deposit(pool.pool_address, coins);
     
     event::emit(StakedEvent {
@@ -324,15 +324,15 @@ public entry fun stake(
 
 /// Unstake tokens from the rewards pool
 public entry fun unstake(
-    unstaker: signer,
-    admin: signer,
+    unstaker: &signer,
+    admin: &signer,
     pool_id: u64,
     amount: u64,
     pool_registry_addr: address,
 ) acquires RewardsPool {
     assert!(amount > 0, error::invalid_argument(E_ZERO_AMOUNT));
     
-    let unstaker_addr = signer::address_of(&unstaker);
+    let unstaker_addr = signer::address_of(unstaker);
     
     // Validate registry exists
     assert!(exists<RewardsPool>(pool_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -366,10 +366,10 @@ public entry fun unstake(
     assert!(pool_balance >= amount, error::invalid_state(E_INSUFFICIENT_BALANCE));
     
     // For MVP: pool_address must equal pool_registry_addr to use admin signer
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     assert!(pool.pool_address == pool_registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
     assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
-    let coins = coin::withdraw<aptos_coin::AptosCoin>(&admin, amount);
+    let coins = coin::withdraw<aptos_coin::AptosCoin>(admin, amount);
     coin::deposit(unstaker_addr, coins);
     
     event::emit(UnstakedEvent {
@@ -401,12 +401,12 @@ public fun get_pending_rewards(addr: address, pool_id: u64, pool_addr: address):
 /// Note: Entry functions cannot take custom structs as transaction parameters.
 /// This function accepts separate vectors of pool_ids and amounts.
 public entry fun bulk_stake(
-    staker: signer,
+    staker: &signer,
     pool_ids: vector<u64>,
     amounts: vector<u64>,
     pool_registry_addr: address,
 ) acquires RewardsPool {
-    let staker_addr = signer::address_of(&staker);
+    let staker_addr = signer::address_of(staker);
     
     // Validate registry exists
     assert!(exists<RewardsPool>(pool_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -465,7 +465,7 @@ public entry fun bulk_stake(
             pool.total_staked = pool.total_staked + amount;
             
             // Transfer coins to pool (staking)
-            let coins = coin::withdraw<aptos_coin::AptosCoin>(&staker, amount);
+            let coins = coin::withdraw<aptos_coin::AptosCoin>(staker, amount);
             coin::deposit(pool.pool_address, coins);
             
             event::emit(StakedEvent {
@@ -504,12 +504,12 @@ public entry fun bulk_stake(
 /// Note: Entry functions cannot take custom structs as transaction parameters.
 /// This function accepts separate vectors of pool_ids and amounts.
 public entry fun bulk_unstake(
-    unstaker: signer,
+    unstaker: &signer,
     pool_ids: vector<u64>,
     amounts: vector<u64>,
     pool_registry_addr: address,
 ) acquires RewardsPool {
-    let unstaker_addr = signer::address_of(&unstaker);
+    let unstaker_addr = signer::address_of(unstaker);
     
     // Validate registry exists
     assert!(exists<RewardsPool>(pool_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -582,7 +582,7 @@ public entry fun bulk_unstake(
     assert!(pool.pool_address == pool_registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
     // For MVP, we'll skip admin check - unstaker can withdraw their own stake
     // In production, would validate admin or use resource account
-    let coins = coin::withdraw<aptos_coin::AptosCoin>(&unstaker, total_unstake);
+    let coins = coin::withdraw<aptos_coin::AptosCoin>(unstaker, total_unstake);
     coin::deposit(unstaker_addr, coins);
     
     // Emit events for each unstake
@@ -635,9 +635,6 @@ public fun get_staked_amount(addr: address, pool_id: u64, pool_addr: address): u
     let data = aptos_framework::big_ordered_map::borrow(&pool.reward_data, &addr);
     data.staked_amount
 }
-
-#[test_only]
-use villages_finance::admin;
 
 #[test_only]
 public fun initialize_for_test(admin: &signer, pool_id: u64, minimum_threshold: u64, pool_address: address) {

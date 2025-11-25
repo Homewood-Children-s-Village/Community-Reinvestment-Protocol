@@ -7,7 +7,7 @@ script {
         member_addr: address,
         role: u8,
     ) {
-        members::register_member(admin, member_addr, role);
+        members::register_member(&admin, member_addr, role);
     }
 }
 

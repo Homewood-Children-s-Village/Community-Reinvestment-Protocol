@@ -127,7 +127,7 @@ public fun burn_shares(
 
 /// Transfer shares (restricted - only within approved flows)
 public entry fun transfer_shares(
-    from: signer,
+    from: &signer,
     pool_id: u64,
     to: address,
     share_amount: u64,
@@ -135,7 +135,7 @@ public entry fun transfer_shares(
 ) acquires FractionalShares {
     assert!(share_amount > 0, error::invalid_argument(E_ZERO_AMOUNT));
     
-    let from_addr = signer::address_of(&from);
+    let from_addr = signer::address_of(from);
     assert!(exists<FractionalShares>(shares_addr), error::not_found(E_NOT_INITIALIZED));
     let shares_obj = borrow_global_mut<FractionalShares>(shares_addr);
     assert!(shares_obj.pool_id == pool_id, error::invalid_argument(E_POOL_NOT_FOUND));

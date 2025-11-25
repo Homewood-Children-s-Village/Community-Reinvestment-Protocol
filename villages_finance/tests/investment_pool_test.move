@@ -1,5 +1,5 @@
 #[test_only]
-module villages_finance::investment_pool_test;
+module villages_finance::investment_pool_test {
 
 use villages_finance::investment_pool;
 use villages_finance::admin;
@@ -30,7 +30,7 @@ fun test_create_and_join_pool(admin: signer, borrower: signer, investor: signer)
     compliance::whitelist_address(&admin, investor_addr);
     
     // Register coins for investor
-    aptos_coin::register(&investor);
+    coin::register<aptos_framework::aptos_coin::AptosCoin>(&investor);
     coin::register<aptos_coin::AptosCoin>(&investor);
     
     // Initialize fractional shares for this pool
@@ -71,7 +71,7 @@ fun test_finalize_funding(admin: signer, borrower: signer) {
     let admin_addr = signer::address_of(&admin);
     let borrower_addr = signer::address_of(&borrower);
     
-    aptos_coin::register(&admin);
+    coin::register<aptos_framework::aptos_coin::AptosCoin>(&admin);
     coin::register<aptos_coin::AptosCoin>(&admin);
     compliance::whitelist_address(&admin, admin_addr);
     
@@ -101,7 +101,7 @@ fun test_repay_loan(admin: signer, borrower: signer) {
     let admin_addr = signer::address_of(&admin);
     let borrower_addr = signer::address_of(&borrower);
     
-    aptos_coin::register(&borrower);
+    coin::register<aptos_framework::aptos_coin::AptosCoin>(&borrower);
     coin::register<aptos_coin::AptosCoin>(&borrower);
     
     fractional_asset::initialize(&admin, 0);
@@ -152,13 +152,13 @@ fun test_repayment_rounding_all_funds_claimable(admin: signer, borrower: signer,
     let investor2_addr = signer::address_of(&investor2);
     
     // Register coins
-    aptos_coin::register(&admin);
+    coin::register<aptos_framework::aptos_coin::AptosCoin>(&admin);
     coin::register<aptos_coin::AptosCoin>(&admin);
-    aptos_coin::register(&borrower);
+    coin::register<aptos_framework::aptos_coin::AptosCoin>(&borrower);
     coin::register<aptos_coin::AptosCoin>(&borrower);
-    aptos_coin::register(&investor1);
+    coin::register<aptos_framework::aptos_coin::AptosCoin>(&investor1);
     coin::register<aptos_coin::AptosCoin>(&investor1);
-    aptos_coin::register(&investor2);
+    coin::register<aptos_framework::aptos_coin::AptosCoin>(&investor2);
     coin::register<aptos_coin::AptosCoin>(&investor2);
     
     // Register and whitelist investors
@@ -192,5 +192,7 @@ fun test_repayment_rounding_all_funds_claimable(admin: signer, borrower: signer,
     
     let unclaimed = investment_pool::get_unclaimed_repayment(0, admin_addr);
     assert!(unclaimed == 0, 1); // Initially 0 (no repayment yet)
+}
+
 }
 

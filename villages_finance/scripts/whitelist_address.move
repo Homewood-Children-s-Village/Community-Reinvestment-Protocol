@@ -6,7 +6,7 @@ script {
         admin: signer,
         addr: address,
     ) {
-        compliance::whitelist_address(admin, addr);
+        compliance::whitelist_address(&admin, addr);
     }
 }
 

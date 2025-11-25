@@ -147,21 +147,21 @@ public fun burn(
 
 /// Entry function to mint TimeTokens
 public entry fun mint_entry(
-    minter: signer,
+    minter: &signer,
     recipient: address,
     hours: u64,
     admin_addr: address,
 ) acquires MintCapability {
-    mint(&minter, recipient, hours, admin_addr);
+    mint(minter, recipient, hours, admin_addr);
 }
 
 /// Entry function to burn TimeTokens
 public entry fun burn_entry(
-    burner: signer,
+    burner: &signer,
     hours: u64,
     admin_addr: address,
 ) acquires MintCapability {
-    burn(&burner, hours, admin_addr);
+    burn(burner, hours, admin_addr);
 }
 
 /// Get balance of TimeTokens for an address

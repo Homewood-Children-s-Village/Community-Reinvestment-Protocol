@@ -1,5 +1,5 @@
 #[test_only]
-module villages_finance::integration_test;
+module villages_finance::integration_test {
 
 use villages_finance::admin;
 use villages_finance::members;
@@ -15,6 +15,7 @@ use aptos_framework::coin;
 use aptos_framework::fungible_asset;
 use aptos_framework::primary_fungible_store;
 use std::signer;
+use std::string;
 
 /// Integration test: Admin creates pool, investor joins (cross-user operation)
 #[test(admin = @0x1, investor = @0x2)]
@@ -37,8 +38,7 @@ fun test_cross_user_pool_operations(admin: signer, investor: signer) {
     compliance::whitelist_address(&admin, investor_addr);
     
     // Register coins
-    aptos_coin::register(&investor);
-    coin::register<aptos_coin::AptosCoin>(&investor);
+    coin::register<aptos_framework::aptos_coin::AptosCoin>(&investor);
     
     // Initialize fractional shares
     fractional_asset::initialize(&admin, 0);
@@ -77,7 +77,7 @@ fun test_cross_user_timebank_operations(admin: signer, requester: signer, valida
     members::initialize_for_test(&admin);
     compliance::initialize_for_test(&admin);
     timebank::initialize_for_test(&admin);
-    let (metadata, mint_cap) = time_token::initialize_for_test(&admin);
+    let metadata = time_token::initialize_for_test(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let requester_addr = signer::address_of(&requester);
@@ -135,9 +135,8 @@ fun test_project_proposal_flow(admin: signer, proposer: signer) {
     members::accept_membership(&proposer, admin_addr);
     
     // Proposer creates project (stored at admin_addr)
-    use std::string;
     let metadata_cid = string::utf8(b"QmTest123");
-    project_registry::propose_project(&proposer, metadata_cid, 5000, 100, false, admin_addr, admin_addr);
+    project_registry::propose_project(&proposer, *string::bytes(&metadata_cid), 5000, 100, false, admin_addr, admin_addr);
     
     // Verify project exists at shared registry
     let (proj_proposer, _, usdc, hours, _, status, _) = project_registry::get_project(0, admin_addr);
@@ -172,7 +171,7 @@ fun test_treasury_flow(admin: signer, depositor: signer) {
     compliance::whitelist_address(&admin, depositor_addr);
     
     // Register coins
-    aptos_coin::register(&depositor);
+    coin::register<aptos_framework::aptos_coin::AptosCoin>(&depositor);
     coin::register<aptos_coin::AptosCoin>(&depositor);
     
     // Depositor deposits to shared treasury (stored at admin_addr)
@@ -194,4 +193,6 @@ fun test_treasury_flow(admin: signer, depositor: signer) {
     // Verify withdrawal
     let balance_after = treasury::get_balance(depositor_addr, admin_addr);
     assert!(balance_after == 3000, 2);
+}
+
 }

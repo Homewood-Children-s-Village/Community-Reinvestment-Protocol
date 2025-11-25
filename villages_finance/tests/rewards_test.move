@@ -1,5 +1,5 @@
 #[test_only]
-module villages_finance::rewards_test;
+module villages_finance::rewards_test {
 
 use villages_finance::rewards;
 use villages_finance::admin;
@@ -19,9 +19,9 @@ fun test_distribute_and_claim_rewards(admin: signer, user1: signer) {
     rewards::initialize_for_test(&admin, pool_id, minimum_threshold, pool_address);
     
     // Register coins
-    aptos_coin::register(&admin);
+    coin::register<aptos_framework::aptos_coin::AptosCoin>(&admin);
     coin::register<aptos_coin::AptosCoin>(&admin);
-    aptos_coin::register(&user1);
+    coin::register<aptos_framework::aptos_coin::AptosCoin>(&user1);
     coin::register<aptos_coin::AptosCoin>(&user1);
     
     // User stakes (simplified - would call update_reward_debt)
@@ -42,4 +42,6 @@ fun test_distribute_and_claim_rewards(admin: signer, user1: signer) {
     
     // Verify initialization
     assert!(pending == 0, 0);
+}
+
 }

@@ -191,23 +191,23 @@ public fun get_total_supply(admin_addr: address): u64 acquires MintCapability {
 
 /// Entry function to mint tokens
 public entry fun mint_entry(
-    admin: signer,
+    admin: &signer,
     to: address,
     amount: u64,
     admin_addr: address,
 ) acquires MintCapability {
-    mint(&admin, to, amount, admin_addr);
+    mint(admin, to, amount, admin_addr);
 }
 
 /// Entry function to burn tokens
 /// Withdraws the specified amount from the caller's primary store and burns it
 public entry fun burn_entry(
-    admin: signer,
+    admin: &signer,
     amount: u64,
     admin_addr: address,
 ) acquires MintCapability {
-    let asset = withdraw(&admin, amount, admin_addr);
-    burn(&admin, asset, admin_addr);
+    let asset = withdraw(admin, amount, admin_addr);
+    burn(admin, asset, admin_addr);
 }
 
 #[test_only]

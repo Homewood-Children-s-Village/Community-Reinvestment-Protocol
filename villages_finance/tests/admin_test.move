@@ -1,5 +1,5 @@
 #[test_only]
-module villages_finance::admin_test;
+module villages_finance::admin_test {
 
 use villages_finance::admin;
 use std::signer;
@@ -79,5 +79,7 @@ fun test_transfer_governance_rights(admin: signer) {
     
     // Old admin should no longer have capability
     assert!(!admin::has_admin_capability(admin_addr), 1);
+}
+
 }
 

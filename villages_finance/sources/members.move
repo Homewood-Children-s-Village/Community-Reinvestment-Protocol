@@ -71,18 +71,18 @@ public fun initialize(admin: &signer) {
 
 /// Register a new member (admin only)
 public entry fun register_member(
-    admin: signer,
+    admin: &signer,
     member_addr: address,
     role: u8,
 ) acquires MembershipRegistry, Member {
-    let admin_addr = signer::address_of(&admin);
-    assert!(is_admin_with_registry(&admin, admin_addr), error::permission_denied(E_NOT_ADMIN));
+    let admin_addr = signer::address_of(admin);
+    assert!(is_admin_with_registry(admin, admin_addr), error::permission_denied(E_NOT_ADMIN));
     
     let registry = borrow_global<MembershipRegistry>(admin_addr);
     assert!(!aptos_framework::ordered_map::contains(&registry.registry, &member_addr), error::already_exists(E_MEMBER_ALREADY_EXISTS));
     
     let role_enum = role_from_u8(role);
-    register_member_internal(&admin, admin_addr, member_addr, role_enum);
+    register_member_internal(admin, admin_addr, member_addr, role_enum);
 }
 
 /// Internal function to register a member
@@ -112,12 +112,12 @@ fun register_member_internal(
 
 /// Bulk register members (admin only)
 public entry fun bulk_register_members(
-    admin: signer,
+    admin: &signer,
     addresses: vector<address>,
     roles: vector<u8>,
     registry_addr: address,
 ) acquires MembershipRegistry {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     
     // Validate registry exists
     assert!(exists<MembershipRegistry>(registry_addr), error::invalid_argument(5));
@@ -158,12 +158,12 @@ public entry fun bulk_register_members(
 
 /// Bulk update member roles (admin only)
 public entry fun bulk_update_roles(
-    admin: signer,
+    admin: &signer,
     addresses: vector<address>,
     new_roles: vector<u8>,
     registry_addr: address,
 ) acquires MembershipRegistry, Member {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     
     // Validate registry exists
     assert!(exists<MembershipRegistry>(registry_addr), error::invalid_argument(5));
@@ -212,10 +212,10 @@ public entry fun bulk_update_roles(
 /// Accept membership and create Member resource (called by the member themselves)
 /// Requires registry address where membership was registered
 public entry fun accept_membership(
-    member: signer,
+    member: &signer,
     registry_addr: address,
 ) acquires MembershipRegistry {
-    let member_addr = signer::address_of(&member);
+    let member_addr = signer::address_of(member);
     assert!(!exists<Member>(member_addr), error::already_exists(E_MEMBER_ALREADY_EXISTS));
     assert!(exists<MembershipRegistry>(registry_addr), error::not_found(1));
     
@@ -223,17 +223,17 @@ public entry fun accept_membership(
     assert!(aptos_framework::ordered_map::contains(&registry.registry, &member_addr), error::not_found(E_MEMBER_NOT_FOUND));
     
     let role = *aptos_framework::ordered_map::borrow(&registry.registry, &member_addr);
-    move_to(&member, Member { role });
+    move_to(member, Member { role });
 }
 
 /// Update a member's role (admin only)
 public entry fun update_role(
-    admin: signer,
+    admin: &signer,
     member_addr: address,
     new_role: u8,
 ) acquires MembershipRegistry, Member {
-    let admin_addr = signer::address_of(&admin);
-    assert!(is_admin_with_registry(&admin, admin_addr), error::permission_denied(E_NOT_ADMIN));
+    let admin_addr = signer::address_of(admin);
+    assert!(is_admin_with_registry(admin, admin_addr), error::permission_denied(E_NOT_ADMIN));
     
     let registry = borrow_global_mut<MembershipRegistry>(admin_addr);
     assert!(aptos_framework::ordered_map::contains(&registry.registry, &member_addr), error::not_found(E_MEMBER_NOT_FOUND));
@@ -259,11 +259,11 @@ public entry fun update_role(
 
 /// Revoke membership (admin only)
 public entry fun revoke_membership(
-    admin: signer,
+    admin: &signer,
     member_addr: address,
 ) acquires MembershipRegistry, Member {
-    let admin_addr = signer::address_of(&admin);
-    assert!(is_admin_with_registry(&admin, admin_addr), error::permission_denied(E_NOT_ADMIN));
+    let admin_addr = signer::address_of(admin);
+    assert!(is_admin_with_registry(admin, admin_addr), error::permission_denied(E_NOT_ADMIN));
     
     let registry = borrow_global_mut<MembershipRegistry>(admin_addr);
     assert!(aptos_framework::ordered_map::contains(&registry.registry, &member_addr), error::not_found(E_MEMBER_NOT_FOUND));
@@ -485,9 +485,6 @@ fun role_from_u8(role: u8): Role {
         abort error::invalid_argument(E_INVALID_ROLE)
     }
 }
-
-#[test_only]
-use std::option;
 
 #[test_only]
 public fun initialize_for_test(admin: &signer) {

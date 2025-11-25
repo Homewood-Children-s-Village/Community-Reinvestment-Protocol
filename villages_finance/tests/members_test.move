@@ -1,5 +1,5 @@
 #[test_only]
-module villages_finance::members_test;
+module villages_finance::members_test {
 
 use villages_finance::members;
 use std::signer;
@@ -91,5 +91,7 @@ fun test_get_role(admin: signer) {
     
     let role_opt_none = members::get_role(@0x999);
     assert!(std::option::is_none(&role_opt_none), 3);
+}
+
 }
 

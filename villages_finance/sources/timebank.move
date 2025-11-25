@@ -93,7 +93,7 @@ public fun initialize(admin: &signer) {
 
 /// Create a service request
 public entry fun create_request(
-    requester: signer,
+    requester: &signer,
     hours: u64,
     activity_id: u64,
     members_registry_addr: address,
@@ -101,7 +101,7 @@ public entry fun create_request(
 ) acquires TimeBank {
     assert!(hours > 0, error::invalid_argument(E_ZERO_HOURS));
     
-    let requester_addr = signer::address_of(&requester);
+    let requester_addr = signer::address_of(requester);
     
     // Validate registries
     assert!(exists<TimeBank>(bank_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -152,14 +152,14 @@ public entry fun create_request(
 
 /// Approve a service request (validator/admin only)
 public entry fun approve_request(
-    validator: signer,
+    validator: &signer,
     request_id: u64,
     members_registry_addr: address,
     compliance_registry_addr: address,
     bank_registry_addr: address,
     time_token_admin_addr: address,
 ) acquires TimeBank {
-    let validator_addr = signer::address_of(&validator);
+    let validator_addr = signer::address_of(validator);
     
     // Validate registries
     assert!(exists<TimeBank>(bank_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -193,7 +193,7 @@ public entry fun approve_request(
     request.status = RequestStatus::Approved;
     
     // Mint TimeTokens using FA standard
-    time_token::mint(&validator, request.requester, request.hours, time_token_admin_addr);
+    time_token::mint(validator, request.requester, request.hours, time_token_admin_addr);
 
     event::emit(RequestApprovedEvent {
         request_id,
@@ -204,12 +204,12 @@ public entry fun approve_request(
 
 /// Reject a service request (validator/admin only)
 public entry fun reject_request(
-    validator: signer,
+    validator: &signer,
     request_id: u64,
     members_registry_addr: address,
     bank_registry_addr: address,
 ) acquires TimeBank {
-    let validator_addr = signer::address_of(&validator);
+    let validator_addr = signer::address_of(validator);
     
     // Validate registries
     assert!(exists<TimeBank>(bank_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -337,13 +337,13 @@ public fun list_requests_by_member(member: address, bank_addr: address): vector<
 /// Bulk approve requests (staff/validator only)
 /// Processes multiple requests in a single transaction
 public entry fun bulk_approve_requests(
-    validator: signer,
+    validator: &signer,
     request_ids: vector<u64>,
     bank_registry_addr: address,
     members_registry_addr: address,
     time_token_admin_addr: address,
 ) acquires TimeBank {
-    let validator_addr = signer::address_of(&validator);
+    let validator_addr = signer::address_of(validator);
     
     // Validate registry exists
     assert!(exists<TimeBank>(bank_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -367,7 +367,7 @@ public entry fun bulk_approve_requests(
                 request.status = RequestStatus::Approved;
                 
                 // Mint Time Tokens using FA standard
-                time_token::mint(&validator, request.requester, request.hours, time_token_admin_addr);
+                time_token::mint(validator, request.requester, request.hours, time_token_admin_addr);
                 
                 event::emit(RequestApprovedEvent {
                     request_id,
@@ -402,13 +402,13 @@ public entry fun bulk_approve_requests(
 
 /// Bulk reject requests (staff/validator only)
 public entry fun bulk_reject_requests(
-    validator: signer,
+    validator: &signer,
     request_ids: vector<u64>,
     reason: vector<u8>,
     bank_registry_addr: address,
     members_registry_addr: address,
 ) acquires TimeBank {
-    let validator_addr = signer::address_of(&validator);
+    let validator_addr = signer::address_of(validator);
     
     // Validate registry exists
     assert!(exists<TimeBank>(bank_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -497,12 +497,12 @@ public fun get_volunteer_stats(member: address, bank_addr: address): (u64, u64, 
 
 /// Cancel a pending request (only requester can cancel)
 public entry fun cancel_request(
-    requester: signer,
+    requester: &signer,
     request_id: u64,
     bank_registry_addr: address,
     members_registry_addr: address,
 ) acquires TimeBank {
-    let requester_addr = signer::address_of(&requester);
+    let requester_addr = signer::address_of(requester);
     
     // Validate registries
     assert!(exists<TimeBank>(bank_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -536,7 +536,7 @@ public entry fun cancel_request(
 
 /// Update request details (only requester can update, only if Pending)
 public entry fun update_request(
-    requester: signer,
+    requester: &signer,
     request_id: u64,
     new_hours: u64,
     bank_registry_addr: address,
@@ -544,7 +544,7 @@ public entry fun update_request(
 ) acquires TimeBank {
     assert!(new_hours > 0, error::invalid_argument(E_ZERO_HOURS));
     
-    let requester_addr = signer::address_of(&requester);
+    let requester_addr = signer::address_of(requester);
     
     // Validate registries
     assert!(exists<TimeBank>(bank_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));

@@ -44,11 +44,11 @@ public fun initialize(admin: &signer) {
 
 /// Bulk whitelist addresses (admin only)
 public entry fun bulk_whitelist_addresses(
-    admin: signer,
+    admin: &signer,
     addresses: vector<address>,
     registry_addr: address,
 ) acquires ComplianceRegistry {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     
     // Validate registry exists
     assert!(exists<ComplianceRegistry>(registry_addr), error::invalid_argument(4));
@@ -84,11 +84,11 @@ public entry fun bulk_whitelist_addresses(
 
 /// Bulk remove addresses from whitelist (admin only)
 public entry fun bulk_remove_from_whitelist(
-    admin: signer,
+    admin: &signer,
     addresses: vector<address>,
     registry_addr: address,
 ) acquires ComplianceRegistry {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     
     // Validate registry exists
     assert!(exists<ComplianceRegistry>(registry_addr), error::invalid_argument(4));
@@ -123,10 +123,10 @@ public entry fun bulk_remove_from_whitelist(
 
 /// Whitelist an address (admin only, called after off-chain KYC verification)
 public entry fun whitelist_address(
-    admin: signer,
+    admin: &signer,
     addr: address,
 ) acquires ComplianceRegistry {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     assert!(exists<ComplianceRegistry>(admin_addr), error::not_found(1));
     
     let registry = borrow_global_mut<ComplianceRegistry>(admin_addr);
@@ -144,10 +144,10 @@ public entry fun whitelist_address(
 
 /// Remove an address from whitelist (admin only)
 public entry fun remove_from_whitelist(
-    admin: signer,
+    admin: &signer,
     addr: address,
 ) acquires ComplianceRegistry {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     assert!(exists<ComplianceRegistry>(admin_addr), error::not_found(1));
     
     let registry = borrow_global_mut<ComplianceRegistry>(admin_addr);

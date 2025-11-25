@@ -65,12 +65,12 @@ public fun initialize(admin: &signer) {
 
 /// Set initial parameter (admin only, during initialization)
 public entry fun set_parameter(
-    admin: signer,
+    admin: &signer,
     parameter_name: vector<u8>,
     value: u64,
     registry_addr: address,
 ) acquires ParameterRegistry {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     
     // Validate registry exists
     assert!(exists<ParameterRegistry>(registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -84,14 +84,14 @@ public entry fun set_parameter(
 
 /// Update parameter via governance proposal
 public entry fun update_parameter_via_governance(
-    executor: signer,
+    executor: &signer,
     proposal_id: u64,
     parameter_name: vector<u8>,
     new_value: u64,
     gov_addr: address,
     registry_addr: address,
 ) acquires ParameterRegistry {
-    let executor_addr = signer::address_of(&executor);
+    let executor_addr = signer::address_of(executor);
     
     // Validate registries
     assert!(registry_config::validate_governance(gov_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -186,9 +186,6 @@ public fun list_parameters(registry_addr: address): vector<ParameterEntry> {
     };
     result
 }
-
-#[test_only]
-use std::option;
 
 #[test_only]
 public fun initialize_for_test(admin: &signer) {

@@ -110,11 +110,11 @@ public fun pause_module_internal(
 
 /// Pause a module (admin only)
 public entry fun pause_module(
-    admin: signer,
+    admin: &signer,
     module_name: vector<u8>,
 ) {
-    let admin_addr = signer::address_of(&admin);
-    pause_module_internal(&admin, module_name, admin_addr);
+    let admin_addr = signer::address_of(admin);
+    pause_module_internal(admin, module_name, admin_addr);
 }
 
 /// Internal function to unpause a module (for governance)
@@ -152,11 +152,11 @@ public fun unpause_module_internal(
 
 /// Unpause a module (admin only)
 public entry fun unpause_module(
-    admin: signer,
+    admin: &signer,
     module_name: vector<u8>,
 ) {
-    let admin_addr = signer::address_of(&admin);
-    unpause_module_internal(&admin, module_name, admin_addr);
+    let admin_addr = signer::address_of(admin);
+    unpause_module_internal(admin, module_name, admin_addr);
 }
 
 /// Check if a module is paused
@@ -183,11 +183,11 @@ public fun list_paused_modules(admin_addr: address): vector<vector<u8>> {
 /// Update interest rate for a pool (admin only)
 /// Note: This is a generic parameter update function
 public entry fun update_interest_rate(
-    admin: signer,
+    admin: &signer,
     pool_id: u64,
     new_rate: u64,
 ) {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     assert!(has_admin_capability(admin_addr), error::permission_denied(E_NOT_ADMIN));
     // Rate is typically in basis points (10000 = 100%), validate reasonable range
     assert!(new_rate <= 10000, error::invalid_argument(E_INVALID_RATE));
@@ -227,11 +227,11 @@ public fun transfer_governance_rights_internal(
 
 /// Transfer governance rights to a new admin (admin only)
 public entry fun transfer_governance_rights(
-    admin: signer,
+    admin: &signer,
     new_admin_addr: address,
 ) {
-    let admin_addr = signer::address_of(&admin);
-    transfer_governance_rights_internal(&admin, new_admin_addr, admin_addr);
+    let admin_addr = signer::address_of(admin);
+    transfer_governance_rights_internal(admin, new_admin_addr, admin_addr);
 }
 
 /// Check if an address has admin capability
@@ -271,10 +271,10 @@ fun log_admin_action(
 /// Emergency pause all modules (admin only)
 /// This is a critical admin function for emergency situations
 public entry fun emergency_pause_all(
-    admin: signer,
+    admin: &signer,
     admin_addr: address,
 ) {
-    let admin_addr_check = signer::address_of(&admin);
+    let admin_addr_check = signer::address_of(admin);
     assert!(has_admin_capability(admin_addr_check), error::permission_denied(E_NOT_ADMIN));
     
     // Pause all critical modules
@@ -300,7 +300,7 @@ public fun initialize_for_test(admin: &signer) {
 
 #[test_only]
 public fun create_admin_capability_for_test(admin: &signer) {
-    let admin_addr = signer::address_of(&admin);
+    let admin_addr = signer::address_of(admin);
     if (!exists<AdminCapability>(admin_addr)) {
         move_to(admin, AdminCapability { admin: admin_addr });
     };
