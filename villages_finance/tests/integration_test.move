@@ -171,7 +171,6 @@ fun test_treasury_flow(admin: signer, depositor: signer) {
     compliance::whitelist_address(&admin, depositor_addr);
     
     // Register coins
-    coin::register<aptos_framework::aptos_coin::AptosCoin>(&depositor);
     coin::register<aptos_coin::AptosCoin>(&depositor);
     
     // Depositor deposits to shared treasury (stored at admin_addr)

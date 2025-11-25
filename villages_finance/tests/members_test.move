@@ -25,7 +25,7 @@ fun test_initialize_and_register(admin: signer, user1: signer, user2: signer) {
 }
 
 #[test(admin = @0x1, user1 = @0x2)]
-#[expected_failure(abort_code = 1, location = members)]
+#[expected_failure(abort_code = 327681, location = members)]
 fun test_register_requires_admin(admin: signer, user1: signer) {
     members::initialize_for_test(&admin);
     let admin_addr = signer::address_of(&admin);
@@ -34,7 +34,7 @@ fun test_register_requires_admin(admin: signer, user1: signer) {
 }
 
 #[test(admin = @0x1, user1 = @0x2)]
-#[expected_failure(abort_code = 3, location = members)]
+#[expected_failure(abort_code = 524291, location = members)]
 fun test_duplicate_registration(admin: signer, user1: signer) {
     members::initialize_for_test(&admin);
     members::register_member(&admin, signer::address_of(&user1), 1);
@@ -68,7 +68,7 @@ fun test_revoke_membership(admin: signer, user1: signer) {
 }
 
 #[test(admin = @0x1, user1 = @0x2)]
-#[expected_failure(abort_code = 2, location = members)]
+#[expected_failure(abort_code = 393218, location = members)]
 fun test_revoke_nonexistent_member(admin: signer, user1: signer) {
     members::initialize_for_test(&admin);
     // user1 is not registered, so this should fail

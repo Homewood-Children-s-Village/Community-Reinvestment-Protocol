@@ -690,7 +690,10 @@ fun decode_action(action_type: u8, data: vector<u8>): option::Option<ProposalAct
 #[test_only]
 public fun initialize_for_test(admin: &signer, members_registry_addr: address, token_admin_addr: address) {
     admin::initialize_for_test(admin);
-    initialize(admin, members_registry_addr, token_admin_addr);
+    let admin_addr = signer::address_of(admin);
+    if (!exists<Governance>(admin_addr)) {
+        initialize(admin, members_registry_addr, token_admin_addr);
+    };
 }
 
 }

@@ -25,7 +25,7 @@ fun test_initialize_and_whitelist(admin: signer, user1: signer, user2: signer) {
 }
 
 #[test(admin = @0x1, user1 = @0x2)]
-#[expected_failure(abort_code = 3, location = compliance)]
+#[expected_failure(abort_code = 524291, location = compliance)]
 fun test_duplicate_whitelist(admin: signer, user1: signer) {
     compliance::initialize_for_test(&admin);
     compliance::whitelist_address(&admin, signer::address_of(&user1));
@@ -46,7 +46,7 @@ fun test_remove_from_whitelist(admin: signer, user1: signer) {
 }
 
 #[test(admin = @0x1, user1 = @0x2)]
-#[expected_failure(abort_code = 2, location = compliance)]
+#[expected_failure(abort_code = 393218, location = compliance)]
 fun test_remove_nonexistent(admin: signer, user1: signer) {
     compliance::initialize_for_test(&admin);
     // Try to remove address that was never whitelisted

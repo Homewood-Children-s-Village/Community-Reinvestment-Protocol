@@ -309,7 +309,10 @@ public fun list_top_depositors(treasury_addr: address, limit: u64): vector<Depos
 
 #[test_only]
 public fun initialize_for_test(admin: &signer) {
-    initialize(admin);
+    let admin_addr = signer::address_of(admin);
+    if (!exists<Treasury>(admin_addr)) {
+        initialize(admin);
+    };
 }
 
 }

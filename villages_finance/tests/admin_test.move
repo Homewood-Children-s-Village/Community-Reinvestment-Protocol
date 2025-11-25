@@ -29,7 +29,7 @@ fun test_pause_unpause_module(admin: signer) {
 }
 
 #[test(admin = @0x1)]
-#[expected_failure(abort_code = 3, location = admin)]
+#[expected_failure(abort_code = 524291, location = admin)]
 fun test_pause_already_paused(admin: signer) {
     admin::initialize_for_test(&admin);
     let module_name = b"treasury";
@@ -38,7 +38,7 @@ fun test_pause_already_paused(admin: signer) {
 }
 
 #[test(admin = @0x1)]
-#[expected_failure(abort_code = 4, location = admin)]
+#[expected_failure(abort_code = 393220, location = admin)]
 fun test_unpause_not_paused(admin: signer) {
     admin::initialize_for_test(&admin);
     let module_name = b"treasury";
@@ -46,7 +46,7 @@ fun test_unpause_not_paused(admin: signer) {
 }
 
 #[test(admin = @0x1, user1 = @0x2)]
-#[expected_failure(abort_code = 1, location = admin)]
+#[expected_failure(abort_code = 327681, location = admin)]
 fun test_pause_requires_admin(admin: signer, user1: signer) {
     admin::initialize_for_test(&admin);
     admin::pause_module(&user1, b"treasury");
@@ -60,7 +60,7 @@ fun test_update_interest_rate(admin: signer) {
 }
 
 #[test(admin = @0x1)]
-#[expected_failure(abort_code = 5, location = admin)]
+#[expected_failure(abort_code = 65541, location = admin)]
 fun test_update_interest_rate_invalid(admin: signer) {
     admin::initialize_for_test(&admin);
     // Rate > 10000 (100%) should fail

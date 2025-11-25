@@ -639,7 +639,10 @@ public fun get_staked_amount(addr: address, pool_id: u64, pool_addr: address): u
 #[test_only]
 public fun initialize_for_test(admin: &signer, pool_id: u64, minimum_threshold: u64, pool_address: address) {
     admin::initialize_for_test(admin);
-    initialize(admin, pool_id, minimum_threshold, pool_address);
+    let admin_addr = signer::address_of(admin);
+    if (!exists<RewardsPool>(admin_addr)) {
+        initialize(admin, pool_id, minimum_threshold, pool_address);
+    };
 }
 
 }

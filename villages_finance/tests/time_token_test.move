@@ -46,7 +46,7 @@ fun test_burn(admin: signer, user1: signer) {
 }
 
 #[test(admin = @0x1)]
-#[expected_failure(abort_code = 2, location = time_token)]
+#[expected_failure(abort_code = 65538, location = time_token)]
 fun test_mint_zero_hours(admin: signer) {
     admin::initialize_for_test(&admin);
     let metadata = time_token::initialize_for_test(&admin);

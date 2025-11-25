@@ -216,7 +216,10 @@ public entry fun accept_membership(
     registry_addr: address,
 ) acquires MembershipRegistry {
     let member_addr = signer::address_of(member);
-    assert!(!exists<Member>(member_addr), error::already_exists(E_MEMBER_ALREADY_EXISTS));
+    // Idempotent: if already a member, return early
+    if (exists<Member>(member_addr)) {
+        return
+    };
     assert!(exists<MembershipRegistry>(registry_addr), error::not_found(1));
     
     let registry = borrow_global<MembershipRegistry>(registry_addr);
@@ -488,7 +491,10 @@ fun role_from_u8(role: u8): Role {
 
 #[test_only]
 public fun initialize_for_test(admin: &signer) {
-    initialize(admin);
+    let admin_addr = signer::address_of(admin);
+    if (!exists<MembershipRegistry>(admin_addr)) {
+        initialize(admin);
+    };
 }
 
 }

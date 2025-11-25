@@ -50,7 +50,7 @@ fun test_burn(admin: signer) {
 }
 
 #[test(admin = @0x1)]
-#[expected_failure(abort_code = 2, location = token)]
+#[expected_failure(abort_code = 65538, location = token)]
 fun test_mint_zero_amount(admin: signer) {
     admin::initialize_for_test(&admin);
     let admin_addr = signer::address_of(&admin);

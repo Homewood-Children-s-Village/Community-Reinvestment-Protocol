@@ -201,7 +201,10 @@ public fun exists_compliance_registry(registry_addr: address): bool {
 
 #[test_only]
 public fun initialize_for_test(admin: &signer) {
-    initialize(admin);
+    let admin_addr = signer::address_of(admin);
+    if (!exists<ComplianceRegistry>(admin_addr)) {
+        initialize(admin);
+    };
 }
 
 }

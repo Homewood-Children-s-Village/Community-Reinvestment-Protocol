@@ -327,7 +327,10 @@ fun status_from_u8(status: u8): ProjectStatus {
 #[test_only]
 public fun initialize_for_test(admin: &signer) {
     admin::initialize_for_test(admin);
-    initialize(admin);
+    let admin_addr = signer::address_of(admin);
+    if (!exists<ProjectRegistry>(admin_addr)) {
+        initialize(admin);
+    };
 }
 
 }

@@ -584,7 +584,10 @@ use villages_finance::admin;
 #[test_only]
 public fun initialize_for_test(admin: &signer) {
     admin::initialize_for_test(admin);
-    initialize(admin);
+    let admin_addr = signer::address_of(admin);
+    if (!exists<TimeBank>(admin_addr)) {
+        initialize(admin);
+    };
 }
 
 }

@@ -36,7 +36,7 @@ fun test_create_request(admin: signer, user1: signer) {
 }
 
 #[test(admin = @0x1)]
-#[expected_failure(abort_code = 5, location = timebank)]
+#[expected_failure(abort_code = 65541, location = timebank)]
 fun test_create_request_zero_hours(admin: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
@@ -101,7 +101,7 @@ fun test_reject_request(admin: signer) {
 }
 
 #[test(admin = @0x1, user1 = @0x2)]
-#[expected_failure(abort_code = 6, location = timebank)]
+#[expected_failure(abort_code = 327686, location = timebank)]
 fun test_create_request_requires_membership(admin: signer, user1: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);

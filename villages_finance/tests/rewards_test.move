@@ -19,9 +19,7 @@ fun test_distribute_and_claim_rewards(admin: signer, user1: signer) {
     rewards::initialize_for_test(&admin, pool_id, minimum_threshold, pool_address);
     
     // Register coins
-    coin::register<aptos_framework::aptos_coin::AptosCoin>(&admin);
     coin::register<aptos_coin::AptosCoin>(&admin);
-    coin::register<aptos_framework::aptos_coin::AptosCoin>(&user1);
     coin::register<aptos_coin::AptosCoin>(&user1);
     
     // User stakes (simplified - would call update_reward_debt)

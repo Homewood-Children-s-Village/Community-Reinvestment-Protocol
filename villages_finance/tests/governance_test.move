@@ -83,7 +83,7 @@ fun test_execute_proposal(admin: signer, voter1: signer) {
 }
 
 #[test(admin = @0x1, voter1 = @0x2)]
-#[expected_failure(abort_code = 6, location = governance)]
+#[expected_failure(abort_code = 524294, location = governance)]
 fun test_double_vote(admin: signer, voter1: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
@@ -108,7 +108,7 @@ fun test_double_vote(admin: signer, voter1: signer) {
 }
 
 #[test(admin = @0x1, voter1 = @0x2)]
-#[expected_failure(abort_code = 7, location = governance)]
+#[expected_failure(abort_code = 327687, location = governance)]
 fun test_vote_requires_membership(admin: signer, voter1: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);

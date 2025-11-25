@@ -22,7 +22,7 @@ fun test_initialize_and_deposit(admin: signer, user1: signer) {
     compliance::whitelist_address(&admin, admin_addr);
     
     // Setup: give admin some coins
-    coin::register<aptos_framework::aptos_coin::AptosCoin>(&admin);
+    coin::register<aptos_coin::AptosCoin>(&admin);
     coin::register<aptos_coin::AptosCoin>(&user1);
     
     // Deposit 1000 coins
@@ -37,7 +37,7 @@ fun test_initialize_and_deposit(admin: signer, user1: signer) {
 }
 
 #[test(admin = @0x1)]
-#[expected_failure(abort_code = 2, location = treasury)]
+#[expected_failure(abort_code = 65538, location = treasury)]
 fun test_deposit_zero(admin: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
@@ -59,7 +59,7 @@ fun test_withdraw(admin: signer) {
     
     members::accept_membership(&admin, admin_addr);
     compliance::whitelist_address(&admin, admin_addr);
-    coin::register<aptos_framework::aptos_coin::AptosCoin>(&admin);
+    coin::register<aptos_coin::AptosCoin>(&admin);
     
     // Deposit
     let deposit_amount = 1000;
@@ -74,7 +74,7 @@ fun test_withdraw(admin: signer) {
 }
 
 #[test(admin = @0x1)]
-#[expected_failure(abort_code = 3, location = treasury)]
+#[expected_failure(abort_code = 196611, location = treasury)]
 fun test_withdraw_insufficient(admin: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
@@ -83,7 +83,7 @@ fun test_withdraw_insufficient(admin: signer) {
     let admin_addr = signer::address_of(&admin);
     members::accept_membership(&admin, admin_addr);
     compliance::whitelist_address(&admin, admin_addr);
-    coin::register<aptos_framework::aptos_coin::AptosCoin>(&admin);
+    coin::register<aptos_coin::AptosCoin>(&admin);
     
     treasury::deposit(&admin, 100, admin_addr, admin_addr, admin_addr);
     // Updated: add admin parameter
@@ -100,7 +100,7 @@ fun test_transfer_to_pool(admin: signer) {
     
     members::accept_membership(&admin, admin_addr);
     compliance::whitelist_address(&admin, admin_addr);
-    coin::register<aptos_framework::aptos_coin::AptosCoin>(&admin);
+    coin::register<aptos_coin::AptosCoin>(&admin);
     
     treasury::deposit(&admin, 1000, admin_addr, admin_addr, admin_addr);
     

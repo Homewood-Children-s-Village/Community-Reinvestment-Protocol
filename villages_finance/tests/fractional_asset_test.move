@@ -24,7 +24,7 @@ fun test_mint_shares(admin: signer, user1: signer) {
 }
 
 #[test(admin = @0x1)]
-#[expected_failure(abort_code = 4, location = fractional_asset)]
+#[expected_failure(abort_code = 65540, location = fractional_asset)]
 fun test_mint_zero_shares(admin: signer) {
     fractional_asset::initialize_for_test(&admin, 1);
     let admin_addr = signer::address_of(&admin);
