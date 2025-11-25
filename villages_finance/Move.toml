@@ -1,0 +1,15 @@
+[package]
+name = "villages_finance"
+version = "1.0.0"
+
+[addresses]
+villages_finance = "0x1"
+
+[dev-addresses]
+villages_finance = "0x1"
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+rev = "mainnet"
+subdir = "aptos-move/framework/aptos-framework"
+
