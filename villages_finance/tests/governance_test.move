@@ -54,6 +54,7 @@ fun test_create_and_vote_simple(admin: signer, voter1: signer, voter2: signer) {
     // Vote yes
     governance::vote(&voter1, 0, 0, gov_addr);
     governance::vote(&voter2, 0, 0, gov_addr);
+    governance::finalize_proposal(&admin, 0, gov_addr);
     
     // Check status
     let (_, _, status, yes, no, abstain, _, mechanism) = governance::get_proposal(0, gov_addr);
@@ -91,6 +92,7 @@ fun test_execute_proposal(admin: signer, voter1: signer) {
     
     governance::activate_proposal(&admin, 0, gov_addr);
     governance::vote(&voter1, 0, 0, gov_addr); // Yes
+    governance::finalize_proposal(&admin, 0, gov_addr);
     
     governance::execute_proposal(&admin, 0, gov_addr);
     
@@ -189,6 +191,7 @@ fun test_proposal_rejection(admin: signer, voter1: signer, voter2: signer) {
     // Vote no (choice = 1)
     governance::vote(&voter1, 0, 1, gov_addr);
     governance::vote(&voter2, 0, 1, gov_addr);
+    governance::finalize_proposal(&admin, 0, gov_addr);
     
     // Check status - should be rejected (votes_no > votes_yes)
     let (_, _, status, yes, no, _, _, _) = governance::get_proposal(0, gov_addr);
@@ -240,6 +243,7 @@ fun test_proposal_status_transitions(admin: signer, voter1: signer, voter2: sign
     // Vote yes
     governance::vote(&voter1, 0, 0, gov_addr);
     governance::vote(&voter2, 0, 0, gov_addr);
+    governance::finalize_proposal(&admin, 0, gov_addr);
     
     // Check status is Passed (2)
     let (_, _, status2, yes, _, _, _, _) = governance::get_proposal(0, gov_addr);
@@ -255,7 +259,7 @@ fun test_proposal_status_transitions(admin: signer, voter1: signer, voter2: sign
 }
 
 #[test(admin = @0x1, voter1 = @0x2)]
-#[expected_failure(abort_code = 3, location = governance)]
+#[expected_failure(abort_code = 196611, location = governance)]
 fun test_execute_proposal_not_passed(admin: signer, voter1: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
@@ -291,7 +295,7 @@ fun test_execute_proposal_not_passed(admin: signer, voter1: signer) {
 }
 
 #[test(admin = @0x1, voter1 = @0x2)]
-#[expected_failure(abort_code = 3, location = governance)]
+#[expected_failure(abort_code = 196611, location = governance)]
 fun test_execute_proposal_already_executed(admin: signer, voter1: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
@@ -319,6 +323,7 @@ fun test_execute_proposal_already_executed(admin: signer, voter1: signer) {
     
     governance::activate_proposal(&admin, 0, gov_addr);
     governance::vote(&voter1, 0, 0, gov_addr);
+    governance::finalize_proposal(&admin, 0, gov_addr);
     governance::execute_proposal(&admin, 0, gov_addr);
     
     // Try to execute again - should fail
@@ -365,6 +370,8 @@ fun test_multiple_proposals_simultaneous(admin: signer, voter1: signer, voter2: 
     // Vote on both independently
     governance::vote(&voter1, 0, 0, gov_addr);
     governance::vote(&voter2, 1, 0, gov_addr);
+    governance::finalize_proposal(&admin, 0, gov_addr);
+    governance::finalize_proposal(&admin, 1, gov_addr);
     
     // Check both proposals passed
     let (_, _, status0, yes0, _, _, _, _) = governance::get_proposal(0, gov_addr);
@@ -375,9 +382,9 @@ fun test_multiple_proposals_simultaneous(admin: signer, voter1: signer, voter2: 
     assert!(yes1 == 1, 3);
 }
 
-#[test(admin = @0x1, voter1 = @0x2)]
-#[expected_failure(abort_code = 3, location = governance)]
-fun test_vote_after_proposal_passed(admin: signer, voter1: signer) {
+#[test(admin = @0x1, voter1 = @0x2, voter2 = @0x3)]
+#[expected_failure(abort_code = 196611, location = governance)]
+fun test_vote_after_proposal_passed(admin: signer, voter1: signer, voter2: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
     let admin_addr = signer::address_of(&admin);
@@ -390,6 +397,8 @@ fun test_vote_after_proposal_passed(admin: signer, voter1: signer) {
     
     members::register_member(&admin, signer::address_of(&voter1), 2);
     members::accept_membership(&voter1, admin_addr);
+    members::register_member(&admin, signer::address_of(&voter2), 2);
+    members::accept_membership(&voter2, admin_addr);
     
     let name = string::utf8(b"Test Token");
     let symbol = string::utf8(b"TEST");
@@ -405,15 +414,15 @@ fun test_vote_after_proposal_passed(admin: signer, voter1: signer) {
     governance::activate_proposal(&admin, 0, gov_addr);
     governance::vote(&voter1, 0, 0, gov_addr); // This passes the proposal
     
-    // Try to vote again after proposal passed - should fail (status is Passed, not Active)
-    // Note: This will fail with E_ALREADY_VOTED if voter1 tries again, or E_INVALID_STATUS if different voter
-    // For this test, we'll use a different voter scenario - but voter1 already voted
-    // So we need voter2, but let's test the status check
-    // Actually, the status check happens before duplicate check, so this should fail with E_INVALID_STATUS
+    // Finalize to mark proposal as Passed
+    governance::finalize_proposal(&admin, 0, gov_addr);
+
+    // Different voter attempts to vote after finalization - should fail with invalid status
+    governance::vote(&voter2, 0, 0, gov_addr);
 }
 
 #[test(admin = @0x1, voter1 = @0x2, voter2 = @0x3)]
-#[expected_failure(abort_code = 3, location = governance)]
+#[expected_failure(abort_code = 196611, location = governance)]
 fun test_vote_after_proposal_rejected(admin: signer, voter1: signer, voter2: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
@@ -443,6 +452,7 @@ fun test_vote_after_proposal_rejected(admin: signer, voter1: signer, voter2: sig
     
     governance::activate_proposal(&admin, 0, gov_addr);
     governance::vote(&voter1, 0, 1, gov_addr); // Vote no - this rejects the proposal
+    governance::finalize_proposal(&admin, 0, gov_addr);
     
     // voter2 tries to vote after proposal rejected - should fail
     governance::vote(&voter2, 0, 0, gov_addr);

@@ -277,7 +277,7 @@ fun test_join_pool_multiple_investors(admin: signer, investor1: signer, investor
 }
 
 #[test(admin = @0x1, investor = @0x2)]
-#[expected_failure(abort_code = 327687, location = investment_pool)]
+#[expected_failure(abort_code = 327688, location = investment_pool)]
 fun test_join_pool_not_whitelisted(admin: signer, investor: signer) {
     initialize_test_state(&admin);
     
@@ -523,7 +523,7 @@ fun test_claim_repayment_already_claimed(admin: signer, borrower: signer, invest
 }
 
 #[test(admin = @0x1, borrower = @0x2, investor = @0x3)]
-#[expected_failure(abort_code = 3, location = investment_pool)]
+#[expected_failure(abort_code = 196611, location = investment_pool)]
 fun test_claim_repayment_pool_not_completed(admin: signer, borrower: signer, investor: signer) {
     initialize_test_state(&admin);
     

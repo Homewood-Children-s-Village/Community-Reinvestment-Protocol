@@ -364,16 +364,16 @@ public entry fun join_pool(
     assert!((pool.status is PoolStatus::Pending) || (pool.status is PoolStatus::Active), 
         error::invalid_state(E_INVALID_STATUS));
     
-    // Check member status
-    assert!(
-        members::is_member_with_registry(investor_addr, pool.members_registry_addr),
-        error::permission_denied(E_NOT_MEMBER)
-    );
-    
-    // Check compliance/KYC
+    // Check compliance/KYC first (most specific failure)
     assert!(
         compliance::is_whitelisted(investor_addr, pool.compliance_registry_addr),
         error::permission_denied(E_NOT_WHITELISTED)
+    );
+    
+    // Then verify membership
+    assert!(
+        members::is_member_with_registry(investor_addr, pool.members_registry_addr),
+        error::permission_denied(E_NOT_MEMBER)
     );
     
     // Check investor has sufficient balance of the configured FA
@@ -625,10 +625,12 @@ public entry fun claim_repayment(
     registry_addr: address,
 ) acquires PoolRegistry {
     let investor_addr = signer::address_of(investor);
+    let admin_addr = signer::address_of(admin);
     
     // Validate registry exists
     assert!(exists<PoolRegistry>(registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
     let registry = borrow_global_mut<PoolRegistry>(registry_addr);
+    assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
     
     assert!(aptos_framework::big_ordered_map::contains(&registry.pools, &pool_id), 
         error::not_found(E_POOL_NOT_FOUND));
@@ -675,8 +677,6 @@ public entry fun claim_repayment(
     // Transfer share to investor
     // For MVP: pool_address must equal registry_addr to use admin signer
     assert!(pool.pool_address == registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
-    let admin_addr = signer::address_of(admin);
-    assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
     let asset = token::withdraw(admin, final_share, pool.token_admin_addr);
     deposit_asset(investor_addr, pool.token_admin_addr, asset);
     

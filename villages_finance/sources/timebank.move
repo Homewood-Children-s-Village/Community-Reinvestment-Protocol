@@ -22,6 +22,7 @@ const E_NOT_MEMBER: u64 = 6;
 const E_INVALID_REGISTRY: u64 = 7;
 const E_NOT_AUTHORIZED: u64 = 8;
 const E_ZERO_AMOUNT: u64 = 9;
+const E_NOT_WHITELISTED: u64 = 10;
 
 /// Service request status
 public enum RequestStatus has copy, drop, store {
@@ -193,7 +194,7 @@ public entry fun approve_request(
     // Check compliance/KYC before minting
     assert!(
         compliance::is_whitelisted(request.requester, compliance_registry_addr),
-        error::permission_denied(1) // E_NOT_WHITELISTED
+        error::permission_denied(E_NOT_WHITELISTED)
     );
     
     // Store values before modifying
@@ -367,9 +368,12 @@ public entry fun bulk_approve_requests(
     // Validate registry exists
     assert!(exists<TimeBank>(bank_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
     
-    // Check permissions after input validation
-    assert!(members::has_role_with_registry(validator_addr, members::validator_role_u8(), members_registry_addr), 
-        error::permission_denied(E_NOT_VALIDATOR));
+    // Check permissions after input validation (validator or admin)
+    assert!(
+        members::has_role_with_registry(validator_addr, members::validator_role_u8(), members_registry_addr) ||
+        members::has_role_with_registry(validator_addr, 0, members_registry_addr),
+        error::permission_denied(E_NOT_VALIDATOR)
+    );
     
     let bank = borrow_global_mut<TimeBank>(bank_registry_addr);
     
@@ -447,9 +451,12 @@ public entry fun bulk_reject_requests(
     // Validate registry exists
     assert!(exists<TimeBank>(bank_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
     
-    // Check permissions after input validation
-    assert!(members::has_role_with_registry(validator_addr, members::validator_role_u8(), members_registry_addr), 
-        error::permission_denied(E_NOT_VALIDATOR));
+    // Check permissions after input validation (validator or admin)
+    assert!(
+        members::has_role_with_registry(validator_addr, members::validator_role_u8(), members_registry_addr) ||
+        members::has_role_with_registry(validator_addr, 0, members_registry_addr),
+        error::permission_denied(E_NOT_VALIDATOR)
+    );
     
     let bank = borrow_global_mut<TimeBank>(bank_registry_addr);
     
@@ -460,9 +467,11 @@ public entry fun bulk_reject_requests(
     while (i < batch_size) {
         let request_id = *vector::borrow(&request_ids, i);
         if (aptos_framework::big_ordered_map::contains(&bank.requests, &request_id)) {
-            let request = aptos_framework::big_ordered_map::borrow_mut(&mut bank.requests, &request_id);
+            let request = aptos_framework::big_ordered_map::remove(&mut bank.requests, &request_id);
             if (request.status is RequestStatus::Pending) {
+                let requester_addr = request.requester;
                 request.status = RequestStatus::Rejected;
+                aptos_framework::big_ordered_map::add(&mut bank.requests, request_id, request);
                 
                 event::emit(RequestRejectedEvent {
                     request_id,
@@ -471,7 +480,7 @@ public entry fun bulk_reject_requests(
                 
                 // Record in event history
                 event_history::record_user_event(
-                    request.requester,
+                    requester_addr,
                     event_history::event_type_request_rejected(),
                     option::none(),
                     option::none(),
@@ -483,6 +492,8 @@ public entry fun bulk_reject_requests(
                 
                 rejected_count = rejected_count + 1;
             } else {
+                // Re-insert without changes if not pending
+                aptos_framework::big_ordered_map::add(&mut bank.requests, request_id, request);
                 vector::push_back(&mut failed_ids, request_id);
             };
         } else {

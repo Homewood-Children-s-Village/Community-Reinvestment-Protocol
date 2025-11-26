@@ -243,7 +243,6 @@ fun test_full_volunteer_hour_journey(admin: signer, requester: signer, validator
     members::accept_membership(&recipient, admin_addr);
     
     compliance::whitelist_address(&admin, requester_addr);
-    compliance::whitelist_address(&admin, recipient_addr);
     
     // Step 1: Create request
     timebank::create_request(&requester, 5, 1, admin_addr, bank_registry_addr);
@@ -263,7 +262,6 @@ fun test_full_volunteer_hour_journey(admin: signer, requester: signer, validator
     assert!(status == 1, 1); // Approved
     
     // Step 6: Transfer TimeTokens to recipient
-    compliance::whitelist_address(&admin, recipient_addr);
     time_token::transfer(&requester, recipient_addr, 5, admin_addr);
     
     // Step 7: Verify balances after transfer
@@ -383,6 +381,7 @@ fun test_full_governance_journey(admin: signer, voter1: signer, voter2: signer, 
     governance::vote(&voter1, 0, 0, gov_addr); // Yes
     governance::vote(&voter2, 0, 0, gov_addr); // Yes
     governance::vote(&voter3, 0, 1, gov_addr); // No
+    governance::finalize_proposal(&admin, 0, gov_addr);
     
     // Step 4: Check status - should be passed (2 yes > 1 no)
     let (_, _, status, yes, no, _, _, _) = governance::get_proposal(0, gov_addr);

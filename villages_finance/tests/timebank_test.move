@@ -205,7 +205,7 @@ fun test_bulk_approve_requests_partial_failure(admin: signer, user1: signer, val
 }
 
 #[test(admin = @0x1)]
-#[expected_failure(abort_code = 1, location = timebank)]
+#[expected_failure(abort_code = 65545, location = timebank)]
 fun test_bulk_approve_requests_empty_vector(admin: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
@@ -243,7 +243,7 @@ fun test_update_request(admin: signer, user1: signer) {
 }
 
 #[test(admin = @0x1, user1 = @0x2, user2 = @0x3)]
-#[expected_failure(abort_code = 327685, location = timebank)]
+#[expected_failure(abort_code = 327688, location = timebank)]
 fun test_update_request_not_owner(admin: signer, user1: signer, user2: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
@@ -266,7 +266,7 @@ fun test_update_request_not_owner(admin: signer, user1: signer, user2: signer) {
 }
 
 #[test(admin = @0x1, user1 = @0x2)]
-#[expected_failure(abort_code = 3, location = timebank)]
+#[expected_failure(abort_code = 196612, location = timebank)]
 fun test_update_request_not_pending(admin: signer, user1: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
@@ -377,7 +377,7 @@ fun test_bulk_reject_requests(admin: signer, user1: signer, user2: signer) {
 }
 
 #[test(admin = @0x1, user1 = @0x2)]
-#[expected_failure(abort_code = 327687, location = timebank)]
+#[expected_failure(abort_code = 327690, location = timebank)]
 fun test_approve_request_not_whitelisted(admin: signer, user1: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);

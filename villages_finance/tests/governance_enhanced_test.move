@@ -60,6 +60,7 @@ fun test_token_weighted_voting(admin: signer, voter1: signer, voter2: signer) {
     // Vote yes - voter1 has 100 tokens, voter2 has 50 tokens
     governance::vote(&voter1, 0, 0, gov_addr);
     governance::vote(&voter2, 0, 0, gov_addr);
+    governance::finalize_proposal(&admin, 0, gov_addr);
     
     // Check status - should pass with 150 total voting power
     let (_, _, status, yes, _, _, _, mechanism) = governance::get_proposal(0, gov_addr);
@@ -105,6 +106,7 @@ fun test_quadratic_voting(admin: signer, voter1: signer) {
     
     governance::activate_proposal(&admin, 0, gov_addr);
     governance::vote(&voter1, 0, 0, gov_addr);
+    governance::finalize_proposal(&admin, 0, gov_addr);
     
     // Check status - quadratic: sqrt(100) = 10 voting power
     let (_, _, status, yes, _, _, _, mechanism) = governance::get_proposal(0, gov_addr);
@@ -150,6 +152,7 @@ fun test_conviction_voting(admin: signer, voter1: signer) {
     
     governance::activate_proposal(&admin, 0, gov_addr);
     governance::vote(&voter1, 0, 0, gov_addr);
+    governance::finalize_proposal(&admin, 0, gov_addr);
     
     // Check status - conviction voting currently uses token-weighted (simplified)
     // So voting power = 100 (same as TokenWeighted for now)
@@ -206,6 +209,8 @@ fun test_mixed_voting_mechanisms(admin: signer, voter1: signer, voter2: signer) 
     // Vote on both
     governance::vote(&voter1, 0, 0, gov_addr); // Simple: 1 vote
     governance::vote(&voter1, 1, 0, gov_addr); // TokenWeighted: 100 votes
+    governance::finalize_proposal(&admin, 0, gov_addr);
+    governance::finalize_proposal(&admin, 1, gov_addr);
     
     // Check results
     let (_, _, status0, yes0, _, _, _, mechanism0) = governance::get_proposal(0, gov_addr);

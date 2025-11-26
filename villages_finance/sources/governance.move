@@ -374,14 +374,6 @@ public entry fun vote(
         VoteChoice::No => proposal.votes_no = proposal.votes_no + voting_power,
         VoteChoice::Abstain => proposal.votes_abstain = proposal.votes_abstain + voting_power,
     };
-    
-    // Check if threshold met
-    if (proposal.votes_yes >= proposal.threshold) {
-        proposal.status = ProposalStatus::Passed;
-    } else if (proposal.votes_no > proposal.votes_yes) {
-        proposal.status = ProposalStatus::Rejected;
-    };
-
     event::emit(VoteCastEvent {
         proposal_id,
         voter: voter_addr,
@@ -399,6 +391,43 @@ public entry fun vote(
         option::none(),
         option::some(choice),
     );
+}
+
+/// Finalize proposal outcome (admin controlled)
+public entry fun finalize_proposal(
+    admin: &signer,
+    proposal_id: u64,
+    gov_addr: address,
+) acquires Governance {
+    let admin_addr = signer::address_of(admin);
+
+    // Verify admin role
+    assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
+
+    // Validate registry exists
+    assert!(exists<Governance>(gov_addr), error::invalid_argument(E_INVALID_REGISTRY));
+    let governance = borrow_global_mut<Governance>(gov_addr);
+
+    assert!(aptos_framework::ordered_map::contains(&governance.proposals, &proposal_id),
+        error::not_found(E_PROPOSAL_NOT_FOUND));
+
+    let proposal = aptos_framework::ordered_map::borrow_mut(&mut governance.proposals, &proposal_id);
+    assert!(proposal.status is ProposalStatus::Active, error::invalid_state(E_INVALID_STATUS));
+
+    let yes_votes = proposal.votes_yes;
+    let no_votes = proposal.votes_no;
+    let threshold = proposal.threshold;
+
+    let passed = yes_votes >= threshold;
+    let rejected = !passed && (no_votes >= threshold || no_votes > yes_votes);
+
+    assert!(passed || rejected, error::invalid_argument(E_INSUFFICIENT_VOTES));
+
+    if (passed) {
+        proposal.status = ProposalStatus::Passed;
+    } else {
+        proposal.status = ProposalStatus::Rejected;
+    };
 }
 
 /// Execute proposal action

@@ -141,6 +141,11 @@ fun test_cancel_project_with_active_pool(admin: signer, user1: signer) {
     let admin_addr = signer::address_of(&admin);
     let user1_addr = signer::address_of(&user1);
     
+    // Register proposer and whitelist
+    members::register_member(&admin, user1_addr, 1);
+    members::accept_membership(&user1, admin_addr);
+    compliance::whitelist_address(&admin, user1_addr);
+    
     // Propose and approve project
     let metadata_cid = string::utf8(b"QmTest123");
     project_registry::propose_project(&user1, *string::bytes(&metadata_cid), 5000, 100, false, admin_addr, admin_addr);

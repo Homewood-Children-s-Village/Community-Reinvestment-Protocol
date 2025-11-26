@@ -1020,6 +1020,21 @@ Tests are located in `tests/` directory:
 4. **Pagination**: Add pagination for large result sets
 5. **Rate Limiting**: Consider rate limiting for bulk operations
 6. **Gas Optimization**: Optimize gas costs for high-frequency operations
+7. **Automatic Proposal Expiration**: Implement timestamp-based automatic finalization for governance proposals
+   - **Current State**: Proposals require manual admin intervention via `finalize_proposal()` to transition from `Active` to `Passed`/`Rejected`
+   - **Proposed Enhancement**: Add automatic expiration based on voting period
+   - **Implementation Requirements**:
+     - Add `voting_period: u64` parameter to `create_proposal()` (duration in seconds, e.g., 7 days = 604800)
+     - Store `activated_at: u64` timestamp when `activate_proposal()` is called (using `timestamp::now_seconds()`)
+     - Calculate `expires_at: u64 = activated_at + voting_period` in the `GovernanceProposal` struct
+     - Replace `created_at: proposal_id` with real timestamp `timestamp::now_seconds()` in `create_proposal()`
+     - Add expiration check in `vote()` function: if `timestamp::now_seconds() >= proposal.expires_at`, auto-finalize based on current votes
+     - Default to "Rejected" status if threshold not met by expiration time
+     - Optionally add a `check_expiration()` view function to check proposal expiration status
+   - **Benefits**: 
+     - Self-executing proposals reduce reliance on manual admin intervention
+     - Clear voting deadlines improve governance transparency
+     - Prevents proposals from remaining in `Active` state indefinitely
 
 ### Integration Points
 
