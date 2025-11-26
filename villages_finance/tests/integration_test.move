@@ -20,6 +20,18 @@ use std::signer;
 use std::string;
 use std::vector;
 
+const INVESTMENT_TOKEN_NAME: vector<u8> = b"Integration Investment Token";
+const INVESTMENT_TOKEN_SYMBOL: vector<u8> = b"IIT";
+
+fun ensure_investment_token_initialized(admin: &signer) {
+    let admin_addr = signer::address_of(admin);
+    if (!token::is_initialized(admin_addr)) {
+        let name = string::utf8(INVESTMENT_TOKEN_NAME);
+        let symbol = string::utf8(INVESTMENT_TOKEN_SYMBOL);
+        token::initialize_for_test(admin, name, symbol);
+    };
+}
+
 /// Integration test: Admin creates pool, investor joins (cross-user operation)
 #[test(admin = @0x1, investor = @0x2)]
 fun test_cross_user_pool_operations(admin: signer, investor: signer) {
@@ -29,6 +41,7 @@ fun test_cross_user_pool_operations(admin: signer, investor: signer) {
     compliance::initialize_for_test(&admin);
     investment_pool::initialize_for_test(&admin);
     fractional_asset::initialize_for_test(&admin, 0);
+    ensure_investment_token_initialized(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let investor_addr = signer::address_of(&investor);
@@ -58,6 +71,7 @@ fun test_cross_user_pool_operations(admin: signer, investor: signer) {
         admin_addr, // fractional_shares_addr
         admin_addr, // compliance_registry_addr
         admin_addr, // members_registry_addr
+        admin_addr,
     );
     
     // Verify pool exists at admin_addr (shared registry)
@@ -268,6 +282,7 @@ fun test_full_project_investment_journey(admin: signer, proposer: signer, invest
     project_registry::initialize_for_test(&admin);
     investment_pool::initialize_for_test(&admin);
     fractional_asset::initialize_for_test(&admin, 0);
+    ensure_investment_token_initialized(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let proposer_addr = signer::address_of(&proposer);
@@ -285,9 +300,6 @@ fun test_full_project_investment_journey(admin: signer, proposer: signer, invest
     compliance::whitelist_address(&admin, investor1_addr);
     compliance::whitelist_address(&admin, investor2_addr);
     
-    coin::register<aptos_coin::AptosCoin>(&investor1);
-    coin::register<aptos_coin::AptosCoin>(&investor2);
-    
     // Step 1: Propose project
     let metadata_cid = string::utf8(b"QmTest123");
     project_registry::propose_project(&proposer, *string::bytes(&metadata_cid), 5000, 100, false, admin_addr, admin_addr);
@@ -296,7 +308,19 @@ fun test_full_project_investment_journey(admin: signer, proposer: signer, invest
     project_registry::approve_project(&admin, 0, admin_addr);
     
     // Step 3: Create pool
-    investment_pool::create_pool(&admin, 0, 5000, 500, 86400, proposer_addr, admin_addr, admin_addr, admin_addr, admin_addr);
+    investment_pool::create_pool(
+        &admin,
+        0,
+        5000,
+        500,
+        86400,
+        proposer_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+    );
     
     // Step 4: Multiple investors join pool (would require actual coins)
     // investment_pool::join_pool(&investor1, 0, 2000, admin_addr);

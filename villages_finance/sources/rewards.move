@@ -5,11 +5,11 @@ use std::error;
 use std::vector;
 use aptos_framework::event;
 use aptos_framework::big_ordered_map;
-use aptos_framework::coin::{Self, Coin};
-use aptos_framework::aptos_coin;
-use aptos_framework::account;
+use aptos_framework::fungible_asset::{Self, FungibleAsset};
+use aptos_framework::primary_fungible_store;
 use villages_finance::event_history;
 use villages_finance::admin;
+use villages_finance::token;
 use std::option;
 
 /// Error codes
@@ -41,7 +41,8 @@ struct RewardsPool has key {
     cumulative_reward_index: u128, // For efficient calculation
     total_staked: u64,
     minimum_threshold: u64, // Minimum reward amount to claim
-    pool_address: address, // Address where reward funds are held
+    pool_address: address, // Address where funds are held
+    token_admin_addr: address, // FA admin controlling staking token
 }
 
 // Events
@@ -79,12 +80,14 @@ public fun initialize(
     pool_id: u64,
     minimum_threshold: u64,
     pool_address: address,
+    token_admin_addr: address,
 ) {
     let admin_addr = signer::address_of(admin);
     assert!(!exists<RewardsPool>(admin_addr), error::already_exists(1));
     
-    // For MVP: Use registry address as pool_address to simplify coin withdrawals
-    let actual_pool_address = admin_addr; // Use registry address for MVP
+    assert!(token::is_initialized(token_admin_addr), error::invalid_argument(E_INVALID_REGISTRY));
+    assert!(pool_address == admin_addr, error::invalid_argument(E_INVALID_REGISTRY)); // MVP constraint
+    let actual_pool_address = pool_address;
     
     move_to(admin, RewardsPool {
         pool_id,
@@ -93,6 +96,7 @@ public fun initialize(
         total_staked: 0,
         minimum_threshold,
         pool_address: actual_pool_address,
+        token_admin_addr,
     });
 }
 
@@ -112,10 +116,11 @@ public entry fun distribute_rewards(
     let pool = borrow_global_mut<RewardsPool>(pool_registry_addr);
     assert!(pool.pool_id == pool_id, error::invalid_argument(1));
     
-    // Transfer coins to pool address
-    // For MVP: pool_address equals pool_registry_addr, so we can deposit directly
-    let coins = coin::withdraw<aptos_coin::AptosCoin>(distributor, total_amount);
-    coin::deposit(pool.pool_address, coins);
+    // Transfer assets to pool address
+    let balance = pool_balance(signer::address_of(distributor), pool.token_admin_addr);
+    assert!(balance >= total_amount, error::invalid_state(E_INSUFFICIENT_BALANCE));
+    let asset = token::withdraw(distributor, total_amount, pool.token_admin_addr);
+    deposit_asset(pool.pool_address, pool.token_admin_addr, asset);
     
     // Update cumulative reward index
     if (pool.total_staked > 0) {
@@ -214,16 +219,15 @@ public entry fun claim_rewards(
     assert!(amount >= pool.minimum_threshold, error::invalid_argument(E_BELOW_THRESHOLD));
     
     // Check pool has sufficient balance
-    let pool_balance = coin::balance<aptos_coin::AptosCoin>(pool.pool_address);
-    assert!(pool_balance >= amount, error::invalid_state(E_INSUFFICIENT_BALANCE));
+    let balance = pool_balance(pool.pool_address, pool.token_admin_addr);
+    assert!(balance >= amount, error::invalid_state(E_INSUFFICIENT_BALANCE));
     
-    // Transfer coins to claimer
-    // For MVP: pool_address must equal pool_registry_addr to use admin signer
-    let admin_addr = signer::address_of(admin);
+    // Transfer assets to claimer (MVP: admin signer controls pool)
     assert!(pool.pool_address == pool_registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
+    let admin_addr = signer::address_of(admin);
     assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
-    let coins = coin::withdraw<aptos_coin::AptosCoin>(admin, amount);
-    coin::deposit(claimer_addr, coins);
+    let asset = token::withdraw(admin, amount, pool.token_admin_addr);
+    deposit_asset(claimer_addr, pool.token_admin_addr, asset);
     
     data.pending_rewards = 0;
 
@@ -299,9 +303,11 @@ public entry fun stake(
     // Update total staked
     pool.total_staked = pool.total_staked + amount;
     
-    // Transfer coins to pool (staking)
-    let coins = coin::withdraw<aptos_coin::AptosCoin>(staker, amount);
-    coin::deposit(pool.pool_address, coins);
+    // Transfer assets to pool (staking)
+    let balance = pool_balance(staker_addr, pool.token_admin_addr);
+    assert!(balance >= amount, error::invalid_state(E_INSUFFICIENT_BALANCE));
+    let asset = token::withdraw(staker, amount, pool.token_admin_addr);
+    deposit_asset(pool.pool_address, pool.token_admin_addr, asset);
     
     event::emit(StakedEvent {
         pool_id,
@@ -361,16 +367,16 @@ public entry fun unstake(
     // Update total staked
     pool.total_staked = pool.total_staked - amount;
     
-    // Transfer coins back to unstaker
-    let pool_balance = coin::balance<aptos_coin::AptosCoin>(pool.pool_address);
-    assert!(pool_balance >= amount, error::invalid_state(E_INSUFFICIENT_BALANCE));
+    // Transfer assets back to unstaker
+    let pool_balance_amt = pool_balance(pool.pool_address, pool.token_admin_addr);
+    assert!(pool_balance_amt >= amount, error::invalid_state(E_INSUFFICIENT_BALANCE));
     
-    // For MVP: pool_address must equal pool_registry_addr to use admin signer
+    // For MVP: admin signer controls pool funds
     let admin_addr = signer::address_of(admin);
     assert!(pool.pool_address == pool_registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
     assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
-    let coins = coin::withdraw<aptos_coin::AptosCoin>(admin, amount);
-    coin::deposit(unstaker_addr, coins);
+    let asset = token::withdraw(admin, amount, pool.token_admin_addr);
+    deposit_asset(unstaker_addr, pool.token_admin_addr, asset);
     
     event::emit(UnstakedEvent {
         pool_id,
@@ -464,9 +470,9 @@ public entry fun bulk_stake(
             // Update total staked
             pool.total_staked = pool.total_staked + amount;
             
-            // Transfer coins to pool (staking)
-            let coins = coin::withdraw<aptos_coin::AptosCoin>(staker, amount);
-            coin::deposit(pool.pool_address, coins);
+            // Transfer assets to pool (staking)
+            let asset = token::withdraw(staker, amount, pool.token_admin_addr);
+            deposit_asset(pool.pool_address, pool.token_admin_addr, asset);
             
             event::emit(StakedEvent {
                 pool_id,
@@ -505,6 +511,7 @@ public entry fun bulk_stake(
 /// This function accepts separate vectors of pool_ids and amounts.
 public entry fun bulk_unstake(
     unstaker: &signer,
+    admin: &signer,
     pool_ids: vector<u64>,
     amounts: vector<u64>,
     pool_registry_addr: address,
@@ -572,18 +579,15 @@ public entry fun bulk_unstake(
     // Update total staked
     pool.total_staked = pool.total_staked - total_unstake;
     
-    // Transfer coins back to unstaker
-    let pool_balance = coin::balance<aptos_coin::AptosCoin>(pool.pool_address);
-    assert!(pool_balance >= total_unstake, error::invalid_state(E_INSUFFICIENT_BALANCE));
+    // Transfer assets back to unstaker
+    let pool_balance_amt = pool_balance(pool.pool_address, pool.token_admin_addr);
+    assert!(pool_balance_amt >= total_unstake, error::invalid_state(E_INSUFFICIENT_BALANCE));
     
-    // For MVP: pool_address must equal pool_registry_addr to use unstaker signer
-    // Note: This assumes unstaker has permission to withdraw from pool
-    // In production, would use separate admin or resource account signer
     assert!(pool.pool_address == pool_registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
-    // For MVP, we'll skip admin check - unstaker can withdraw their own stake
-    // In production, would validate admin or use resource account
-    let coins = coin::withdraw<aptos_coin::AptosCoin>(unstaker, total_unstake);
-    coin::deposit(unstaker_addr, coins);
+    let admin_addr = signer::address_of(admin);
+    assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
+    let asset = token::withdraw(admin, total_unstake, pool.token_admin_addr);
+    deposit_asset(unstaker_addr, pool.token_admin_addr, asset);
     
     // Emit events for each unstake
     let i = 0;
@@ -637,12 +641,26 @@ public fun get_staked_amount(addr: address, pool_id: u64, pool_addr: address): u
 }
 
 #[test_only]
-public fun initialize_for_test(admin: &signer, pool_id: u64, minimum_threshold: u64, pool_address: address) {
+public fun initialize_for_test(admin: &signer, pool_id: u64, minimum_threshold: u64, pool_address: address, token_admin_addr: address) {
     admin::initialize_for_test(admin);
     let admin_addr = signer::address_of(admin);
     if (!exists<RewardsPool>(admin_addr)) {
-        initialize(admin, pool_id, minimum_threshold, pool_address);
+        initialize(admin, pool_id, minimum_threshold, pool_address, token_admin_addr);
     };
+}
+
+fun pool_balance(addr: address, token_admin_addr: address): u64 {
+    if (!token::is_initialized(token_admin_addr)) {
+        return 0
+    };
+    let metadata = token::get_metadata(token_admin_addr);
+    primary_fungible_store::balance(addr, metadata)
+}
+
+fun deposit_asset(recipient: address, token_admin_addr: address, asset: FungibleAsset) {
+    let metadata = token::get_metadata(token_admin_addr);
+    let store = primary_fungible_store::ensure_primary_store_exists(recipient, metadata);
+    fungible_asset::deposit(store, asset);
 }
 
 }

@@ -6,17 +6,34 @@ use villages_finance::admin;
 use villages_finance::compliance;
 use villages_finance::fractional_asset;
 use villages_finance::members;
-use aptos_framework::aptos_coin;
-use aptos_framework::coin;
+use villages_finance::token;
 use std::signer;
+use std::string;
+
+const TEST_TOKEN_NAME: vector<u8> = b"Test Investment Token";
+const TEST_TOKEN_SYMBOL: vector<u8> = b"TINV";
+
+fun ensure_token_initialized(admin: &signer) {
+    let admin_addr = signer::address_of(admin);
+    if (!token::is_initialized(admin_addr)) {
+        let name = string::utf8(TEST_TOKEN_NAME);
+        let symbol = string::utf8(TEST_TOKEN_SYMBOL);
+        token::initialize_for_test(admin, name, symbol);
+    };
+}
+
+fun initialize_test_state(admin: &signer) {
+    admin::initialize_for_test(admin);
+    members::initialize_for_test(admin);
+    investment_pool::initialize_for_test(admin);
+    compliance::initialize_for_test(admin);
+    fractional_asset::initialize_for_test(admin, 0);
+    ensure_token_initialized(admin);
+}
 
 #[test(admin = @0x1, borrower = @0x2, investor = @0x3)]
 fun test_create_and_join_pool(admin: signer, borrower: signer, investor: signer) {
-    admin::initialize_for_test(&admin);
-    members::initialize_for_test(&admin);
-    investment_pool::initialize_for_test(&admin);
-    compliance::initialize_for_test(&admin);
-    fractional_asset::initialize_for_test(&admin, 0);
+    initialize_test_state(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let borrower_addr = signer::address_of(&borrower);
@@ -31,7 +48,6 @@ fun test_create_and_join_pool(admin: signer, borrower: signer, investor: signer)
     
     // Note: Coin registration commented out - this test doesn't actually use coins
     // (join_pool is commented out)
-    // coin::register<aptos_coin::AptosCoin>(&investor);
     
     // Create pool
     let project_id = 1;
@@ -43,7 +59,19 @@ fun test_create_and_join_pool(admin: signer, borrower: signer, investor: signer)
     let compliance_registry_addr = admin_addr;
     let members_registry_addr = admin_addr;
     
-    investment_pool::create_pool(&admin, project_id, target_amount, interest_rate, duration, borrower_addr, pool_address, fractional_shares_addr, compliance_registry_addr, members_registry_addr);
+    investment_pool::create_pool(
+        &admin,
+        project_id,
+        target_amount,
+        interest_rate,
+        duration,
+        borrower_addr,
+        pool_address,
+        fractional_shares_addr,
+        compliance_registry_addr,
+        members_registry_addr,
+        admin_addr,
+    );
     
     // Join pool (requires coins - simplified test)
     let investment = 1000;
@@ -59,20 +87,26 @@ fun test_create_and_join_pool(admin: signer, borrower: signer, investor: signer)
 
 #[test(admin = @0x1, borrower = @0x2)]
 fun test_finalize_funding(admin: signer, borrower: signer) {
-    admin::initialize_for_test(&admin);
-    members::initialize_for_test(&admin);
-    investment_pool::initialize_for_test(&admin);
-    compliance::initialize_for_test(&admin);
-    fractional_asset::initialize_for_test(&admin, 0);
+    initialize_test_state(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let borrower_addr = signer::address_of(&borrower);
     
-    // Note: Coin registration commented out - this test doesn't actually use coins
-    // coin::register<aptos_coin::AptosCoin>(&admin);
     compliance::whitelist_address(&admin, admin_addr);
     
-    investment_pool::create_pool(&admin, 1, 5000, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
+    investment_pool::create_pool(
+        &admin,
+        1,
+        5000,
+        500,
+        86400,
+        borrower_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+    );
     
     // Invest enough to meet goal (simplified - would need actual coins)
     // investment_pool::join_pool(&admin, 0, 5000, admin_addr);
@@ -87,20 +121,24 @@ fun test_finalize_funding(admin: signer, borrower: signer) {
 
 #[test(admin = @0x1, borrower = @0x2)]
 fun test_repay_loan(admin: signer, borrower: signer) {
-    admin::initialize_for_test(&admin);
-    members::initialize_for_test(&admin);
-    investment_pool::initialize_for_test(&admin);
-    compliance::initialize_for_test(&admin);
-    fractional_asset::initialize_for_test(&admin, 0);
+    initialize_test_state(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let borrower_addr = signer::address_of(&borrower);
     
-    // Note: Coin registration commented out - this test doesn't actually use coins
-    // (repay_loan is commented out)
-    // coin::register<aptos_coin::AptosCoin>(&borrower);
-    
-    investment_pool::create_pool(&admin, 1, 5000, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
+    investment_pool::create_pool(
+        &admin,
+        1,
+        5000,
+        500,
+        86400,
+        borrower_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+    );
     
     // Simplified test - actual repayment requires funded pool
     // investment_pool::join_pool(&admin, 0, 5000, admin_addr);
@@ -114,15 +152,23 @@ fun test_repay_loan(admin: signer, borrower: signer) {
 
 #[test(admin = @0x1)]
 fun test_mark_defaulted(admin: signer) {
-    admin::initialize_for_test(&admin);
-    members::initialize_for_test(&admin);
-    investment_pool::initialize_for_test(&admin);
-    compliance::initialize_for_test(&admin);
-    fractional_asset::initialize_for_test(&admin, 0);
+    initialize_test_state(&admin);
     
     let admin_addr = signer::address_of(&admin);
     
-    investment_pool::create_pool(&admin, 1, 5000, 500, 86400, @0x999, admin_addr, admin_addr, admin_addr, admin_addr);
+    investment_pool::create_pool(
+        &admin,
+        1,
+        5000,
+        500,
+        86400,
+        @0x999,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+    );
     
     investment_pool::mark_defaulted(&admin, 0, admin_addr);
     
@@ -132,11 +178,7 @@ fun test_mark_defaulted(admin: signer) {
 
 #[test(admin = @0x1, borrower = @0x2, investor1 = @0x3, investor2 = @0x4)]
 fun test_repayment_rounding_all_funds_claimable(admin: signer, borrower: signer, investor1: signer, investor2: signer) {
-    admin::initialize_for_test(&admin);
-    members::initialize_for_test(&admin);
-    investment_pool::initialize_for_test(&admin);
-    compliance::initialize_for_test(&admin);
-    fractional_asset::initialize_for_test(&admin, 0);
+    initialize_test_state(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let borrower_addr = signer::address_of(&borrower);
@@ -145,10 +187,6 @@ fun test_repayment_rounding_all_funds_claimable(admin: signer, borrower: signer,
     
     // Note: Coin registration commented out - this test doesn't actually use coins
     // (join_pool and repay_loan are commented out)
-    // coin::register<aptos_coin::AptosCoin>(&admin);
-    // coin::register<aptos_coin::AptosCoin>(&borrower);
-    // coin::register<aptos_coin::AptosCoin>(&investor1);
-    // coin::register<aptos_coin::AptosCoin>(&investor2);
     
     // Register and whitelist investors
     members::register_member(&admin, investor1_addr, 2);
@@ -160,7 +198,19 @@ fun test_repayment_rounding_all_funds_claimable(admin: signer, borrower: signer,
     
     // Create pool with target 1000
     let target_amount = 1000;
-    investment_pool::create_pool(&admin, 1, target_amount, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
+    investment_pool::create_pool(
+        &admin,
+        1,
+        target_amount,
+        500,
+        86400,
+        borrower_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+    );
     
     // Note: In a full test, we would:
     // 1. Fund investors with coins
@@ -183,11 +233,7 @@ fun test_repayment_rounding_all_funds_claimable(admin: signer, borrower: signer,
 
 #[test(admin = @0x1, investor1 = @0x2, investor2 = @0x3)]
 fun test_join_pool_multiple_investors(admin: signer, investor1: signer, investor2: signer) {
-    admin::initialize_for_test(&admin);
-    members::initialize_for_test(&admin);
-    investment_pool::initialize_for_test(&admin);
-    compliance::initialize_for_test(&admin);
-    fractional_asset::initialize_for_test(&admin, 0);
+    initialize_test_state(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let investor1_addr = signer::address_of(&investor1);
@@ -203,15 +249,24 @@ fun test_join_pool_multiple_investors(admin: signer, investor1: signer, investor
     members::accept_membership(&investor2, admin_addr);
     compliance::whitelist_address(&admin, investor2_addr);
     
-    // Register coins for investors
-    coin::register<aptos_coin::AptosCoin>(&investor1);
-    coin::register<aptos_coin::AptosCoin>(&investor2);
     
     // Fund investors (in real test, would use test framework funding)
     // For now, verify pool creation works
     let project_id = 1;
     let target_amount = 5000;
-    investment_pool::create_pool(&admin, project_id, target_amount, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
+    investment_pool::create_pool(
+        &admin,
+        project_id,
+        target_amount,
+        500,
+        86400,
+        borrower_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+    );
     
     // Verify pool created
     let (proj_id, target, current, status, _, _, _) = investment_pool::get_pool(0, admin_addr);
@@ -224,11 +279,7 @@ fun test_join_pool_multiple_investors(admin: signer, investor1: signer, investor
 #[test(admin = @0x1, investor = @0x2)]
 #[expected_failure(abort_code = 327687, location = investment_pool)]
 fun test_join_pool_not_whitelisted(admin: signer, investor: signer) {
-    admin::initialize_for_test(&admin);
-    members::initialize_for_test(&admin);
-    investment_pool::initialize_for_test(&admin);
-    compliance::initialize_for_test(&admin);
-    fractional_asset::initialize_for_test(&admin, 0);
+    initialize_test_state(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let investor_addr = signer::address_of(&investor);
@@ -238,9 +289,20 @@ fun test_join_pool_not_whitelisted(admin: signer, investor: signer) {
     members::register_member(&admin, investor_addr, 2);
     members::accept_membership(&investor, admin_addr);
     
-    coin::register<aptos_coin::AptosCoin>(&investor);
     
-    investment_pool::create_pool(&admin, 1, 5000, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
+    investment_pool::create_pool(
+        &admin,
+        1,
+        5000,
+        500,
+        86400,
+        borrower_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+    );
     
     // Try to join pool - should fail (not whitelisted)
     investment_pool::join_pool(&investor, 0, 1000, admin_addr);
@@ -249,11 +311,7 @@ fun test_join_pool_not_whitelisted(admin: signer, investor: signer) {
 #[test(admin = @0x1, investor = @0x2)]
 #[expected_failure(abort_code = 65538, location = investment_pool)]
 fun test_join_pool_zero_amount(admin: signer, investor: signer) {
-    admin::initialize_for_test(&admin);
-    members::initialize_for_test(&admin);
-    investment_pool::initialize_for_test(&admin);
-    compliance::initialize_for_test(&admin);
-    fractional_asset::initialize_for_test(&admin, 0);
+    initialize_test_state(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let investor_addr = signer::address_of(&investor);
@@ -263,7 +321,19 @@ fun test_join_pool_zero_amount(admin: signer, investor: signer) {
     members::accept_membership(&investor, admin_addr);
     compliance::whitelist_address(&admin, investor_addr);
     
-    investment_pool::create_pool(&admin, 1, 5000, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
+    investment_pool::create_pool(
+        &admin,
+        1,
+        5000,
+        500,
+        86400,
+        borrower_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+    );
     
     // Try to join with zero amount - should fail
     investment_pool::join_pool(&investor, 0, 0, admin_addr);
@@ -271,11 +341,7 @@ fun test_join_pool_zero_amount(admin: signer, investor: signer) {
 
 #[test(admin = @0x1, investor = @0x2)]
 fun test_fractional_shares_minted_on_join(admin: signer, investor: signer) {
-    admin::initialize_for_test(&admin);
-    members::initialize_for_test(&admin);
-    investment_pool::initialize_for_test(&admin);
-    compliance::initialize_for_test(&admin);
-    fractional_asset::initialize_for_test(&admin, 0);
+    initialize_test_state(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let investor_addr = signer::address_of(&investor);
@@ -285,9 +351,20 @@ fun test_fractional_shares_minted_on_join(admin: signer, investor: signer) {
     members::accept_membership(&investor, admin_addr);
     compliance::whitelist_address(&admin, investor_addr);
     
-    coin::register<aptos_coin::AptosCoin>(&investor);
     
-    investment_pool::create_pool(&admin, 1, 5000, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
+    investment_pool::create_pool(
+        &admin,
+        1,
+        5000,
+        500,
+        86400,
+        borrower_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+    );
     
     // Note: join_pool would mint fractional shares, but requires actual coins
     // Verify fractional shares structure exists
@@ -297,17 +374,25 @@ fun test_fractional_shares_minted_on_join(admin: signer, investor: signer) {
 
 #[test(admin = @0x1, investor = @0x2)]
 fun test_finalize_funding_requires_admin(admin: signer, investor: signer) {
-    admin::initialize_for_test(&admin);
-    members::initialize_for_test(&admin);
-    investment_pool::initialize_for_test(&admin);
-    compliance::initialize_for_test(&admin);
-    fractional_asset::initialize_for_test(&admin, 0);
+    initialize_test_state(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let investor_addr = signer::address_of(&investor);
     let borrower_addr = @0x999;
     
-    investment_pool::create_pool(&admin, 1, 5000, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
+    investment_pool::create_pool(
+        &admin,
+        1,
+        5000,
+        500,
+        86400,
+        borrower_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+    );
     
     // Verify pool exists
     let (_, _, _, status, _, _, _) = investment_pool::get_pool(0, admin_addr);
@@ -319,11 +404,7 @@ fun test_finalize_funding_requires_admin(admin: signer, investor: signer) {
 
 #[test(admin = @0x1, borrower = @0x2, investor = @0x3)]
 fun test_claim_repayment_single_investor(admin: signer, borrower: signer, investor: signer) {
-    admin::initialize_for_test(&admin);
-    members::initialize_for_test(&admin);
-    investment_pool::initialize_for_test(&admin);
-    compliance::initialize_for_test(&admin);
-    fractional_asset::initialize_for_test(&admin, 0);
+    initialize_test_state(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let borrower_addr = signer::address_of(&borrower);
@@ -333,10 +414,20 @@ fun test_claim_repayment_single_investor(admin: signer, borrower: signer, invest
     members::accept_membership(&investor, admin_addr);
     compliance::whitelist_address(&admin, investor_addr);
     
-    coin::register<aptos_coin::AptosCoin>(&borrower);
-    coin::register<aptos_coin::AptosCoin>(&investor);
     
-    investment_pool::create_pool(&admin, 1, 5000, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
+    investment_pool::create_pool(
+        &admin,
+        1,
+        5000,
+        500,
+        86400,
+        borrower_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+    );
     
     // Note: Full test would require:
     // 1. Fund investor with coins
@@ -353,11 +444,7 @@ fun test_claim_repayment_single_investor(admin: signer, borrower: signer, invest
 
 #[test(admin = @0x1, borrower = @0x2, investor1 = @0x3, investor2 = @0x4)]
 fun test_claim_repayment_multiple_investors(admin: signer, borrower: signer, investor1: signer, investor2: signer) {
-    admin::initialize_for_test(&admin);
-    members::initialize_for_test(&admin);
-    investment_pool::initialize_for_test(&admin);
-    compliance::initialize_for_test(&admin);
-    fractional_asset::initialize_for_test(&admin, 0);
+    initialize_test_state(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let borrower_addr = signer::address_of(&borrower);
@@ -372,11 +459,20 @@ fun test_claim_repayment_multiple_investors(admin: signer, borrower: signer, inv
     members::accept_membership(&investor2, admin_addr);
     compliance::whitelist_address(&admin, investor2_addr);
     
-    coin::register<aptos_coin::AptosCoin>(&borrower);
-    coin::register<aptos_coin::AptosCoin>(&investor1);
-    coin::register<aptos_coin::AptosCoin>(&investor2);
     
-    investment_pool::create_pool(&admin, 1, 5000, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
+    investment_pool::create_pool(
+        &admin,
+        1,
+        5000,
+        500,
+        86400,
+        borrower_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+    );
     
     // Note: Full test would require actual coin transfers
     // Verify pool created
@@ -387,11 +483,7 @@ fun test_claim_repayment_multiple_investors(admin: signer, borrower: signer, inv
 #[test(admin = @0x1, borrower = @0x2, investor = @0x3)]
 #[expected_failure(abort_code = 524295, location = investment_pool)]
 fun test_claim_repayment_already_claimed(admin: signer, borrower: signer, investor: signer) {
-    admin::initialize_for_test(&admin);
-    members::initialize_for_test(&admin);
-    investment_pool::initialize_for_test(&admin);
-    compliance::initialize_for_test(&admin);
-    fractional_asset::initialize_for_test(&admin, 0);
+    initialize_test_state(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let borrower_addr = signer::address_of(&borrower);
@@ -401,10 +493,20 @@ fun test_claim_repayment_already_claimed(admin: signer, borrower: signer, invest
     members::accept_membership(&investor, admin_addr);
     compliance::whitelist_address(&admin, investor_addr);
     
-    coin::register<aptos_coin::AptosCoin>(&borrower);
-    coin::register<aptos_coin::AptosCoin>(&investor);
     
-    investment_pool::create_pool(&admin, 1, 5000, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
+    investment_pool::create_pool(
+        &admin,
+        1,
+        5000,
+        500,
+        86400,
+        borrower_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+    );
     
     // Note: Full test would require pool to be funded, repaid, and claimed once
     // Then trying to claim again would fail
@@ -416,11 +518,7 @@ fun test_claim_repayment_already_claimed(admin: signer, borrower: signer, invest
 #[test(admin = @0x1, borrower = @0x2, investor = @0x3)]
 #[expected_failure(abort_code = 3, location = investment_pool)]
 fun test_claim_repayment_pool_not_completed(admin: signer, borrower: signer, investor: signer) {
-    admin::initialize_for_test(&admin);
-    members::initialize_for_test(&admin);
-    investment_pool::initialize_for_test(&admin);
-    compliance::initialize_for_test(&admin);
-    fractional_asset::initialize_for_test(&admin, 0);
+    initialize_test_state(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let borrower_addr = signer::address_of(&borrower);
@@ -430,9 +528,19 @@ fun test_claim_repayment_pool_not_completed(admin: signer, borrower: signer, inv
     members::accept_membership(&investor, admin_addr);
     compliance::whitelist_address(&admin, investor_addr);
     
-    coin::register<aptos_coin::AptosCoin>(&investor);
-    
-    investment_pool::create_pool(&admin, 1, 5000, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
+    investment_pool::create_pool(
+        &admin,
+        1,
+        5000,
+        500,
+        86400,
+        borrower_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+    );
     
     // Try to claim repayment from pool that's not completed - should fail
     investment_pool::claim_repayment(&investor, &admin, 0, admin_addr);

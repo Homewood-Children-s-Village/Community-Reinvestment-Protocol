@@ -5,14 +5,13 @@ use std::error;
 use std::vector;
 use aptos_framework::event;
 use aptos_framework::big_ordered_map;
-use aptos_framework::coin::{Self, Coin};
-use aptos_framework::aptos_coin;
+use aptos_framework::fungible_asset::{Self, FungibleAsset};
 use aptos_framework::primary_fungible_store;
 use aptos_framework::account;
 use villages_finance::fractional_asset;
-use villages_finance::treasury;
 use villages_finance::compliance;
 use villages_finance::members;
+use villages_finance::token;
 use villages_finance::admin;
 use villages_finance::registry_config;
 use villages_finance::project_registry;
@@ -68,6 +67,7 @@ struct InvestmentPool has key, store {
     fractional_shares_addr: address, // Address of fractional shares object
     compliance_registry_addr: address, // For KYC checks
     members_registry_addr: address, // For member checks
+    token_admin_addr: address, // FA admin controlling liquidity token
 }
 
 // Events
@@ -152,16 +152,6 @@ public fun initialize(admin: &signer) {
     };
 }
 
-/// Helper function to validate coin registration
-/// Checks if an address can receive AptosCoin
-fun validate_coin_registration(addr: address): bool {
-    // Check if address has PrimaryFungibleStore which is required to receive coins
-    // In Move, we can check this by attempting to query balance (which requires registration)
-    // For MVP, we'll use a simpler check - verify the address exists and can receive coins
-    // Note: In production, this would be more robust
-    true // Simplified for MVP - in production would check PrimaryFungibleStore exists
-}
-
 /// Create a new investment pool
 public entry fun create_pool(
     admin: &signer,
@@ -174,6 +164,7 @@ public entry fun create_pool(
     fractional_shares_addr: address,
     compliance_registry_addr: address,
     members_registry_addr: address,
+    token_admin_addr: address,
 ) acquires PoolRegistry {
     let admin_addr = signer::address_of(admin);
     
@@ -188,8 +179,8 @@ public entry fun create_pool(
     // Validate fractional shares are initialized
     assert!(fractional_asset::exists_fractional_shares(fractional_shares_addr), error::invalid_argument(E_INVALID_REGISTRY));
     
-    // Validate pool_address can receive coins
-    assert!(validate_coin_registration(pool_address), error::invalid_argument(E_INVALID_REGISTRY));
+    // Validate FA token admin configured
+    assert!(token::is_initialized(token_admin_addr), error::invalid_argument(E_INVALID_REGISTRY));
     
     // Validate project exists and is Approved (if project_registry_addr provided)
     // Note: For MVP, we'll validate project exists. For full validation, would need project_registry_addr parameter
@@ -212,9 +203,10 @@ public entry fun create_pool(
     let pool_id = registry.pool_counter;
     registry.pool_counter = registry.pool_counter + 1;
     
-    // For MVP: Use registry address as pool_address to simplify coin withdrawals
-    // In production: Would create resource account per pool and store signer capabilities
-    let actual_pool_address = admin_addr; // Use registry address for MVP
+    // For MVP: Require pools to custody funds at the admin-controlled registry address.
+    // Future enhancements can attach a per-pool resource account signer via pool_signer_caps.
+    assert!(pool_address == admin_addr, error::invalid_argument(E_INVALID_REGISTRY));
+    let actual_pool_address = pool_address;
     
     let pool = InvestmentPool {
         pool_id,
@@ -235,6 +227,7 @@ public entry fun create_pool(
         fractional_shares_addr,
         compliance_registry_addr,
         members_registry_addr,
+        token_admin_addr,
     };
     
     aptos_framework::big_ordered_map::add(&mut registry.pools, pool_id, pool);
@@ -260,6 +253,7 @@ public entry fun create_pool_from_project(
     members_registry_addr: address,
     project_registry_addr: address,
     pool_registry_addr: address,
+    token_admin_addr: address,
 ) acquires PoolRegistry {
     let admin_addr = signer::address_of(admin);
     
@@ -289,8 +283,8 @@ public entry fun create_pool_from_project(
     // Validate fractional shares are initialized
     assert!(fractional_asset::exists_fractional_shares(fractional_shares_addr), error::invalid_argument(E_INVALID_REGISTRY));
     
-    // Validate pool_address can receive coins
-    assert!(validate_coin_registration(pool_address), error::invalid_argument(E_INVALID_REGISTRY));
+    // Validate FA token admin configured
+    assert!(token::is_initialized(token_admin_addr), error::invalid_argument(E_INVALID_REGISTRY));
     
     assert!(interest_rate <= 10000, error::invalid_argument(1)); // Max 100%
     
@@ -308,8 +302,9 @@ public entry fun create_pool_from_project(
     let pool_id = registry.pool_counter;
     registry.pool_counter = registry.pool_counter + 1;
     
-    // For MVP: Use registry address as pool_address to simplify coin withdrawals
-    let actual_pool_address = pool_registry_addr; // Use registry address for MVP
+    // For MVP: require funds stay under registry control
+    assert!(pool_address == pool_registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
+    let actual_pool_address = pool_address;
     
     let pool = InvestmentPool {
         pool_id,
@@ -330,6 +325,7 @@ public entry fun create_pool_from_project(
         fractional_shares_addr,
         compliance_registry_addr,
         members_registry_addr,
+        token_admin_addr,
     };
     
     aptos_framework::big_ordered_map::add(&mut registry.pools, pool_id, pool);
@@ -377,13 +373,13 @@ public entry fun join_pool(
         error::permission_denied(E_NOT_WHITELISTED)
     );
     
-    // Check investor has sufficient balance
-    let balance = coin::balance<aptos_coin::AptosCoin>(investor_addr);
+    // Check investor has sufficient balance of the configured FA
+    let balance = pool_balance(investor_addr, pool.token_admin_addr);
     assert!(balance >= amount, error::invalid_state(E_INSUFFICIENT_BALANCE));
     
-    // Transfer coins to pool address
-    let coins = coin::withdraw<aptos_coin::AptosCoin>(investor, amount);
-    coin::deposit(pool.pool_address, coins);
+    // Transfer fungible assets to the pool address
+    let asset = token::withdraw(investor, amount, pool.token_admin_addr);
+    deposit_asset(pool.pool_address, pool.token_admin_addr, asset);
     
     // Update contribution
     if (aptos_framework::big_ordered_map::contains(&pool.contributions, &investor_addr)) {
@@ -442,27 +438,13 @@ public entry fun finalize_funding(
     
     // Check pool has sufficient balance before withdrawal
     let total_funds = pool.current_total;
-    let pool_balance = coin::balance<aptos_coin::AptosCoin>(pool.pool_address);
-    assert!(pool_balance >= total_funds, error::invalid_state(E_INSUFFICIENT_BALANCE));
+    let pool_balance_amt = pool_balance(pool.pool_address, pool.token_admin_addr);
+    assert!(pool_balance_amt >= total_funds, error::invalid_state(E_INSUFFICIENT_BALANCE));
     
-    // Transfer funds to borrower
-    // Note: pool_address must be the registry address (where PoolRegistry is stored)
-    // OR a resource account with stored signer capability
-    // For MVP, we assume pool_address == registry_addr for simplicity
-    // In production, would use resource account with stored signer capability
-    let pool_balance = coin::balance<aptos_coin::AptosCoin>(pool.pool_address);
-    assert!(pool_balance >= total_funds, error::invalid_state(E_INSUFFICIENT_BALANCE));
-    
-    // If pool_address is registry_addr, use admin signer; otherwise requires resource account signer
-    // For MVP: assume pool_address == registry_addr
-    if (pool.pool_address == registry_addr) {
-        let coins = coin::withdraw<aptos_coin::AptosCoin>(admin, total_funds);
-        coin::deposit(pool.borrower, coins);
-    } else {
-        // TODO: Extract resource account signer capability from registry
-        // For now, this requires pool_address to be registry_addr
-        abort error::invalid_argument(E_INVALID_REGISTRY)
-    };
+    // For MVP: withdraw using admin signer (pool_address == registry_addr)
+    assert!(pool.pool_address == registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
+    let asset = token::withdraw(admin, total_funds, pool.token_admin_addr);
+    deposit_asset(pool.borrower, pool.token_admin_addr, asset);
     
     pool.status = PoolStatus::Funded;
 
@@ -499,12 +481,12 @@ public entry fun repay_loan(
     let total_owed = principal + interest;
     
     // Check borrower has sufficient balance before withdrawal
-    let borrower_balance = coin::balance<aptos_coin::AptosCoin>(borrower_addr);
+    let borrower_balance = pool_balance(borrower_addr, pool.token_admin_addr);
     assert!(borrower_balance >= total_owed, error::invalid_state(E_INSUFFICIENT_BALANCE));
     
     // Transfer repayment + interest to pool address
-    let repayment_coins = coin::withdraw<aptos_coin::AptosCoin>(borrower, total_owed);
-    coin::deposit(pool.pool_address, repayment_coins);
+    let asset = token::withdraw(borrower, total_owed, pool.token_admin_addr);
+    deposit_asset(pool.pool_address, pool.token_admin_addr, asset);
     
     // Store total repayment amount - investors can claim their share
     pool.total_repayment = total_owed;
@@ -567,14 +549,14 @@ public entry fun bulk_claim_repayments(
                         };
                         
                         if (final_share > 0) {
-                            let pool_balance = coin::balance<aptos_coin::AptosCoin>(pool.pool_address);
-                            if (pool_balance >= final_share) {
-                                // Transfer coins - for MVP: pool_address must equal registry_addr
+                            let pool_balance_amt = pool_balance(pool.pool_address, pool.token_admin_addr);
+                            if (pool_balance_amt >= final_share) {
+                                // Transfer assets - for MVP: pool_address must equal registry_addr
                                 assert!(pool.pool_address == registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
                                 let admin_addr = signer::address_of(admin);
                                 assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
-                                let coins = coin::withdraw<aptos_coin::AptosCoin>(admin, final_share);
-                                coin::deposit(investor_addr, coins);
+                                let asset = token::withdraw(admin, final_share, pool.token_admin_addr);
+                                deposit_asset(investor_addr, pool.token_admin_addr, asset);
                                 
                                 // Update total claimed
                                 pool.total_claimed = pool.total_claimed + final_share;
@@ -673,16 +655,16 @@ public entry fun claim_repayment(
     assert!(final_share > 0, error::invalid_argument(E_ZERO_AMOUNT));
     
     // Check pool has sufficient balance
-    let pool_balance = coin::balance<aptos_coin::AptosCoin>(pool.pool_address);
-    assert!(pool_balance >= final_share, error::invalid_state(E_INSUFFICIENT_BALANCE));
+    let pool_balance_amt = pool_balance(pool.pool_address, pool.token_admin_addr);
+    assert!(pool_balance_amt >= final_share, error::invalid_state(E_INSUFFICIENT_BALANCE));
     
     // Transfer share to investor
     // For MVP: pool_address must equal registry_addr to use admin signer
     assert!(pool.pool_address == registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
     let admin_addr = signer::address_of(admin);
     assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
-    let coins = coin::withdraw<aptos_coin::AptosCoin>(admin, final_share);
-    coin::deposit(investor_addr, coins);
+    let asset = token::withdraw(admin, final_share, pool.token_admin_addr);
+    deposit_asset(investor_addr, pool.token_admin_addr, asset);
     
     // Update total claimed
     pool.total_claimed = pool.total_claimed + final_share;
@@ -944,6 +926,20 @@ fun status_to_u8(status: PoolStatus): u8 {
         PoolStatus::Completed => 3,
         PoolStatus::Defaulted => 4,
     }
+}
+
+fun pool_balance(addr: address, token_admin_addr: address): u64 {
+    if (!token::is_initialized(token_admin_addr)) {
+        return 0
+    };
+    let metadata = token::get_metadata(token_admin_addr);
+    primary_fungible_store::balance(addr, metadata)
+}
+
+fun deposit_asset(recipient: address, token_admin_addr: address, asset: FungibleAsset) {
+    let metadata = token::get_metadata(token_admin_addr);
+    let store = primary_fungible_store::ensure_primary_store_exists(recipient, metadata);
+    fungible_asset::deposit(store, asset);
 }
 
 #[test_only]

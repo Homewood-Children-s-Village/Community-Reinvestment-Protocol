@@ -189,6 +189,11 @@ public fun get_total_supply(admin_addr: address): u64 acquires MintCapability {
     }
 }
 
+#[view]
+public fun is_initialized(admin_addr: address): bool {
+    exists<MintCapability>(admin_addr)
+}
+
 /// Entry function to mint tokens
 public entry fun mint_entry(
     admin: &signer,

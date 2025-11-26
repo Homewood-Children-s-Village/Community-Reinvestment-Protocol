@@ -250,8 +250,8 @@ The platform uses a **registry pattern** where each module stores its state in a
 
 **Key Functions**:
 - `initialize()`: Create pool registry
-- `create_pool()`: Create new investment pool (Admin only)
-- `create_pool_from_project()`: Create pool from approved project (Admin only)
+- `create_pool()`: Create new investment pool (Admin only). Accepts a `token_admin_addr` parameter that references the community fungible asset created via `token.move`.
+- `create_pool_from_project()`: Create pool from approved project (Admin only) using the same token configuration.
 - `join_pool()`: Invest in pool (Member + KYC required)
 - `finalize_funding()`: Finalize when goal met (Admin only)
 - `repay_loan()`: Repay loan with interest (Borrower only)
@@ -261,6 +261,8 @@ The platform uses a **registry pattern** where each module stores its state in a
 - `get_pool()`: Get pool details (view)
 - `get_investor_portfolio()`: Get investor's portfolio (view)
 - `get_borrower_loans()`: Get borrower's loans (view)
+
+> **Tokenization note:** Pools currently require the staking/liquidity token specified by `token_admin_addr`. For the MVP implementation the pool address must match the admin/registry address so that the same signer can withdraw funds when finalizing, repaying, or fulfilling investor claims.
 
 **Pool Status**:
 - `0` - Pending: Created but not yet active
@@ -311,7 +313,7 @@ The platform uses a **registry pattern** where each module stores its state in a
 **Purpose**: Proportional reward distribution to depositors using reward debt pattern.
 
 **Key Functions**:
-- `initialize()`: Create rewards pool
+- `initialize()`: Create rewards pool. Requires `token_admin_addr` pointing to the fungible asset used for staking/reward payouts.
 - `stake()`: Stake tokens in rewards pool
 - `unstake()`: Unstake tokens (requires admin signer for MVP)
 - `distribute_rewards()`: Distribute rewards to pool
@@ -322,6 +324,8 @@ The platform uses a **registry pattern** where each module stores its state in a
 - `get_staked_amount()`: Get staked amount (view)
 
 **Reward Debt Pattern**: Efficient calculation of proportional rewards without iterating through all stakers.
+
+> **Tokenization note:** Rewards staking now uses the community fungible asset created by `token.move`. Admins must initialize the token before calling `rewards::initialize`, and the pool address is constrained to the admin/registry address so the same signer can transfer assets out when processing claims or unstakes.
 
 ---
 

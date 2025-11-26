@@ -7,8 +7,21 @@ use villages_finance::members;
 use villages_finance::investment_pool;
 use villages_finance::compliance;
 use villages_finance::fractional_asset;
+use villages_finance::token;
 use std::signer;
 use std::string;
+
+const PROJECT_TEST_TOKEN_NAME: vector<u8> = b"Project Pool Token";
+const PROJECT_TEST_TOKEN_SYMBOL: vector<u8> = b"PPT";
+
+fun ensure_investment_token_initialized(admin: &signer) {
+    let admin_addr = signer::address_of(admin);
+    if (!token::is_initialized(admin_addr)) {
+        let name = string::utf8(PROJECT_TEST_TOKEN_NAME);
+        let symbol = string::utf8(PROJECT_TEST_TOKEN_SYMBOL);
+        token::initialize_for_test(admin, name, symbol);
+    };
+}
 
 #[test(admin = @0x1, user1 = @0x2)]
 fun test_propose_project(admin: signer, user1: signer) {
@@ -123,6 +136,7 @@ fun test_cancel_project_with_active_pool(admin: signer, user1: signer) {
     investment_pool::initialize_for_test(&admin);
     compliance::initialize_for_test(&admin);
     fractional_asset::initialize_for_test(&admin, 0);
+    ensure_investment_token_initialized(&admin);
     
     let admin_addr = signer::address_of(&admin);
     let user1_addr = signer::address_of(&user1);
@@ -133,7 +147,19 @@ fun test_cancel_project_with_active_pool(admin: signer, user1: signer) {
     project_registry::approve_project(&admin, 0, admin_addr);
     
     // Create pool for project
-    investment_pool::create_pool(&admin, 0, 5000, 500, 86400, user1_addr, admin_addr, admin_addr, admin_addr, admin_addr);
+    investment_pool::create_pool(
+        &admin,
+        0,
+        5000,
+        500,
+        86400,
+        user1_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+        admin_addr,
+    );
     
     // Cancel project - pool should still exist but project is cancelled
     project_registry::update_status(&admin, 0, 4, admin_addr);
