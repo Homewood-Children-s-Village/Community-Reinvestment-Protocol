@@ -8,11 +8,16 @@ use aptos_framework::fungible_asset::{Self, FungibleAsset, Metadata, MintRef, Bu
 use aptos_framework::primary_fungible_store;
 use aptos_framework::object::{Self, Object, ConstructorRef};
 use std::option;
+use villages_finance::compliance;
+use villages_finance::admin;
 
 /// Error codes
 const E_NOT_AUTHORIZED: u64 = 1;
 const E_ZERO_AMOUNT: u64 = 2;
 const E_INSUFFICIENT_BALANCE: u64 = 3;
+const E_TRANSFER_RESTRICTED: u64 = 4;
+const E_NOT_ADMIN: u64 = 5;
+const E_INVALID_REGISTRY: u64 = 6;
 
 /// Time token symbol constant
 const TIME_SYMBOL: vector<u8> = b"TIME";
@@ -25,6 +30,12 @@ struct MintCapability has key, store {
     transfer_ref: TransferRef,
 }
 
+/// Transfer configuration - controls whether transfers are restricted
+struct TransferConfig has key {
+    transfer_restricted: bool,
+    compliance_registry_addr: option::Option<address>,
+}
+
 // Events
 #[event]
 struct TimeTokenMintedEvent has drop, store {
@@ -35,6 +46,13 @@ struct TimeTokenMintedEvent has drop, store {
 #[event]
 struct TimeTokenBurnedEvent has drop, store {
     from: address,
+    hours: u64,
+}
+
+#[event]
+struct TimeTokenTransferredEvent has drop, store {
+    from: address,
+    to: address,
     hours: u64,
 }
 
@@ -66,14 +84,25 @@ public fun initialize(
     let burn_ref = fungible_asset::generate_burn_ref(constructor_ref);
     let transfer_ref = fungible_asset::generate_transfer_ref(constructor_ref);
     
-    // Store mint capability struct
-    let mint_cap = MintCapability {
-        metadata,
-        mint_ref,
-        burn_ref,
-        transfer_ref,
+    // Store mint capability struct (idempotent check)
+    let admin_addr = signer::address_of(admin);
+    if (!exists<MintCapability>(admin_addr)) {
+        let mint_cap = MintCapability {
+            metadata,
+            mint_ref,
+            burn_ref,
+            transfer_ref,
+        };
+        move_to(admin, mint_cap);
     };
-    move_to(admin, mint_cap);
+    
+    // Initialize transfer config (transfers unrestricted by default) - idempotent
+    if (!exists<TransferConfig>(admin_addr)) {
+        move_to(admin, TransferConfig {
+            transfer_restricted: false,
+            compliance_registry_addr: option::none(),
+        });
+    };
     
     metadata
 }
@@ -164,6 +193,107 @@ public entry fun burn_entry(
     burn(burner, hours, admin_addr);
 }
 
+/// Transfer TimeTokens from sender to recipient
+/// If transfer restrictions are enabled, both sender and recipient must be whitelisted
+public entry fun transfer(
+    sender: &signer,
+    recipient: address,
+    hours: u64,
+    admin_addr: address,
+) acquires MintCapability, TransferConfig {
+    assert!(hours > 0, error::invalid_argument(E_ZERO_AMOUNT));
+    
+    let sender_addr = signer::address_of(sender);
+    
+    // Check if MintCapability exists
+    assert!(exists<MintCapability>(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
+    
+    // Check transfer restrictions if enabled
+    if (exists<TransferConfig>(admin_addr)) {
+        let config = borrow_global<TransferConfig>(admin_addr);
+        if (config.transfer_restricted) {
+            // Both sender and recipient must be whitelisted
+            assert!(
+                option::is_some(&config.compliance_registry_addr),
+                error::invalid_argument(E_INVALID_REGISTRY)
+            );
+            let compliance_registry_addr = *option::borrow(&config.compliance_registry_addr);
+            assert!(
+                compliance::is_whitelisted(sender_addr, compliance_registry_addr),
+                error::permission_denied(E_TRANSFER_RESTRICTED)
+            );
+            assert!(
+                compliance::is_whitelisted(recipient, compliance_registry_addr),
+                error::permission_denied(E_TRANSFER_RESTRICTED)
+            );
+        };
+    };
+    
+    let cap = borrow_global<MintCapability>(admin_addr);
+    
+    // Ensure primary store exists for sender
+    let sender_store = primary_fungible_store::ensure_primary_store_exists(sender_addr, cap.metadata);
+    
+    // Check balance
+    let balance = primary_fungible_store::balance(sender_addr, cap.metadata);
+    assert!(balance >= hours, error::invalid_state(E_INSUFFICIENT_BALANCE));
+    
+    // Withdraw from sender's primary store
+    let asset = fungible_asset::withdraw_with_ref(&cap.transfer_ref, sender_store, hours);
+    
+    // Ensure primary store exists for recipient and deposit
+    let recipient_store = primary_fungible_store::ensure_primary_store_exists(recipient, cap.metadata);
+    fungible_asset::deposit(recipient_store, asset);
+    
+    event::emit(TimeTokenTransferredEvent {
+        from: sender_addr,
+        to: recipient,
+        hours,
+    });
+}
+
+/// Enable transfer restrictions (admin only)
+/// When enabled, both sender and recipient must be whitelisted in the compliance registry
+public entry fun enable_transfer_restrictions(
+    admin: &signer,
+    compliance_registry_addr: address,
+    admin_addr: address,
+) acquires TransferConfig {
+    let admin_addr_check = signer::address_of(admin);
+    assert!(admin::has_admin_capability(admin_addr_check), error::permission_denied(E_NOT_ADMIN));
+    assert!(exists<TransferConfig>(admin_addr), error::not_found(E_NOT_AUTHORIZED));
+    assert!(compliance::exists_compliance_registry(compliance_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
+    
+    let config = borrow_global_mut<TransferConfig>(admin_addr);
+    config.transfer_restricted = true;
+    config.compliance_registry_addr = option::some(compliance_registry_addr);
+}
+
+/// Disable transfer restrictions (admin only)
+/// When disabled, transfers are unrestricted
+public entry fun disable_transfer_restrictions(
+    admin: &signer,
+    admin_addr: address,
+) acquires TransferConfig {
+    let admin_addr_check = signer::address_of(admin);
+    assert!(admin::has_admin_capability(admin_addr_check), error::permission_denied(E_NOT_ADMIN));
+    assert!(exists<TransferConfig>(admin_addr), error::not_found(E_NOT_AUTHORIZED));
+    
+    let config = borrow_global_mut<TransferConfig>(admin_addr);
+    config.transfer_restricted = false;
+    config.compliance_registry_addr = option::none();
+}
+
+/// Check if transfer restrictions are enabled
+#[view]
+public fun is_transfer_restricted(admin_addr: address): bool {
+    if (!exists<TransferConfig>(admin_addr)) {
+        return false
+    };
+    let config = borrow_global<TransferConfig>(admin_addr);
+    config.transfer_restricted
+}
+
 /// Get balance of TimeTokens for an address
 #[view]
 public fun balance(addr: address, admin_addr: address): u64 acquires MintCapability {
@@ -175,14 +305,13 @@ public fun balance(addr: address, admin_addr: address): u64 acquires MintCapabil
 }
 
 #[test_only]
-use villages_finance::admin;
-
-#[test_only]
 public fun initialize_for_test(
     admin: &signer,
 ): Object<Metadata> {
     admin::initialize_for_test(admin);
-    initialize(admin)
+    let metadata = initialize(admin);
+    // TransferConfig is automatically initialized in initialize()
+    metadata
 }
 
 }
