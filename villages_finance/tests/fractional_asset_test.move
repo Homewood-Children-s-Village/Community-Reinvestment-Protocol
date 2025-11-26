@@ -65,5 +65,25 @@ fun test_transfer_shares(admin: signer, user1: signer) {
     assert!(user1_shares == 40, 1);
 }
 
+#[test(admin = @0x1, user1 = @0x2)]
+fun test_multiple_pools_isolated(admin: signer, user1: signer) {
+    fractional_asset::initialize_for_test(&admin, 1);
+    let admin_addr = signer::address_of(&admin);
+    let user1_addr = signer::address_of(&user1);
+
+    fractional_asset::ensure_pool(2, admin_addr);
+
+    fractional_asset::mint_shares(&admin, 1, admin_addr, 50, admin_addr);
+    fractional_asset::mint_shares(&admin, 2, user1_addr, 80, admin_addr);
+
+    let pool1_total = fractional_asset::get_total_shares(1, admin_addr);
+    let pool2_total = fractional_asset::get_total_shares(2, admin_addr);
+
+    assert!(pool1_total == 50, 0);
+    assert!(pool2_total == 80, 1);
+    assert!(fractional_asset::get_shares(user1_addr, 1, admin_addr) == 0, 2);
+    assert!(fractional_asset::get_shares(user1_addr, 2, admin_addr) == 80, 3);
+}
+
 }
 

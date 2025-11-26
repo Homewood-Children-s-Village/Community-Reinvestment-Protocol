@@ -99,7 +99,7 @@ fun test_withdraw(admin: signer) {
     
     // Withdraw - Updated: add admin parameter (same signer for MVP)
     let withdraw_amount = 300;
-    treasury::withdraw(&admin, &admin, withdraw_amount, admin_addr);
+    treasury::withdraw(&admin, withdraw_amount, admin_addr);
     
     let balance = treasury::get_balance(admin_addr, admin_addr);
     assert!(balance == 700, 0);
@@ -131,7 +131,7 @@ fun test_withdraw_insufficient(admin: signer) {
     
     treasury::deposit(&admin, 100, admin_addr, admin_addr, admin_addr);
     // Updated: add admin parameter
-    treasury::withdraw(&admin, &admin, 200, admin_addr);
+    treasury::withdraw(&admin, 200, admin_addr);
 }
 
 #[test(admin = @0x1)]

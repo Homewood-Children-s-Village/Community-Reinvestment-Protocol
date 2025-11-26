@@ -73,7 +73,7 @@ fun test_unstake_partial(admin: signer, user1: signer) {
     assert!(staked_before == 1000, 0);
     
     // Note: Actual unstake would require coins in pool
-    // rewards::unstake(&user1, &admin, pool_id, 300, admin_addr);
+    // rewards::unstake(&user1, pool_id, 300, admin_addr);
     // let staked_after = rewards::get_staked_amount(user1_addr, pool_id, admin_addr);
     // assert!(staked_after == 700, 1);
 }
@@ -97,7 +97,7 @@ fun test_unstake_insufficient_balance(admin: signer, user1: signer) {
     // Try to unstake more than staked - should fail
     // Note: This requires actual coins in pool, but the insufficient balance check happens before withdrawal
     // So we can test the validation without coins
-    rewards::unstake(&user1, &admin, pool_id, 200, admin_addr);
+    rewards::unstake(&user1, pool_id, 200, admin_addr);
 }
 
 #[test(admin = @0x1, user1 = @0x2, user2 = @0x3)]
@@ -124,8 +124,8 @@ fun test_unstake_multiple_users(admin: signer, user1: signer, user2: signer) {
     assert!(staked2 == 300, 1);
     
     // Note: Full test would unstake from both users
-    // rewards::unstake(&user1, &admin, pool_id, 200, admin_addr);
-    // rewards::unstake(&user2, &admin, pool_id, 100, admin_addr);
+    // rewards::unstake(&user1, pool_id, 200, admin_addr);
+    // rewards::unstake(&user2, pool_id, 100, admin_addr);
 }
 
 #[test(admin = @0x1, user1 = @0x2)]
@@ -145,7 +145,7 @@ fun test_unstake_zero_amount(admin: signer, user1: signer) {
     
     // Try to unstake zero - should fail (validation happens before any other checks)
     // This will fail at the zero-amount check, so we don't need coins in pool
-    rewards::unstake(&user1, &admin, pool_id, 0, admin_addr);
+    rewards::unstake(&user1, pool_id, 0, admin_addr);
 }
 
 #[test(admin = @0x1, user1 = @0x2)]

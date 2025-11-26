@@ -7,12 +7,17 @@ use std::option;
 use aptos_framework::event;
 use aptos_framework::ordered_map;
 use villages_finance::admin;
+use villages_finance::registry_hub;
 
 /// Error codes
 const E_NOT_ADMIN: u64 = 1;
 const E_MEMBER_NOT_FOUND: u64 = 2;
 const E_MEMBER_ALREADY_EXISTS: u64 = 3;
 const E_INVALID_ROLE: u64 = 4;
+const E_REQUEST_NOT_FOUND: u64 = 5;
+const E_REQUEST_ALREADY_PENDING: u64 = 6;
+const E_INVALID_REQUEST_STATUS: u64 = 7;
+const E_NOT_AUTHORIZED: u64 = 8;
 
 /// Membership roles
 public enum Role has copy, drop, store {
@@ -30,6 +35,28 @@ struct Member has key, store {
 /// Membership registry object - tracks all registered members
 struct MembershipRegistry has key {
     registry: aptos_framework::ordered_map::OrderedMap<address, Role>,
+    counter: u64,
+}
+
+/// Status of a membership request
+public enum RequestStatus has copy, drop, store {
+    Pending,
+    Approved,
+    Rejected,
+}
+
+/// Membership request data
+struct MembershipRequest has store {
+    requester: address,
+    desired_role: Role,
+    note: vector<u8>,
+    status: RequestStatus,
+}
+
+/// Registry for membership requests
+struct MembershipRequestRegistry has key {
+    requests: aptos_framework::ordered_map::OrderedMap<u64, MembershipRequest>,
+    address_to_request: aptos_framework::ordered_map::OrderedMap<address, u64>,
     counter: u64,
 }
 
@@ -52,6 +79,25 @@ struct MembershipRevokedEvent has drop, store {
     member: address,
 }
 
+#[event]
+struct MembershipRequestedEvent has drop, store {
+    request_id: u64,
+    requester: address,
+    role: u8,
+}
+
+#[event]
+struct MembershipRequestApprovedEvent has drop, store {
+    request_id: u64,
+    approver: address,
+}
+
+#[event]
+struct MembershipRequestRejectedEvent has drop, store {
+    request_id: u64,
+    approver: address,
+}
+
 /// Initialize the membership registry
 public fun initialize(admin: &signer) {
     assert!(!exists<MembershipRegistry>(@villages_finance), error::already_exists(1));
@@ -64,6 +110,15 @@ public fun initialize(admin: &signer) {
         registry: aptos_framework::ordered_map::new(),
         counter: 0,
     });
+
+    // Initialize membership request registry alongside membership registry
+    if (!exists<MembershipRequestRegistry>(admin_addr)) {
+        move_to(admin, MembershipRequestRegistry {
+            requests: aptos_framework::ordered_map::new(),
+            address_to_request: aptos_framework::ordered_map::new(),
+            counter: 0,
+        });
+    };
 
     // Register admin as first member
     register_member_internal(admin, admin_addr, admin_addr, Role::Admin);
@@ -154,6 +209,156 @@ public entry fun bulk_register_members(
         };
         i = i + 1;
     };
+}
+
+/// Submit a membership request (non-members)
+public entry fun request_membership(
+    applicant: &signer,
+    registry_addr: address,
+    desired_role: u8,
+    note: vector<u8>,
+) acquires MembershipRegistry, MembershipRequestRegistry {
+    let applicant_addr = signer::address_of(applicant);
+
+    assert!(exists<MembershipRegistry>(registry_addr), error::not_found(1));
+
+    // Ensure applicant is not already a member
+    assert!(
+        !aptos_framework::ordered_map::contains(&borrow_global<MembershipRegistry>(registry_addr).registry, &applicant_addr),
+        error::already_exists(E_MEMBER_ALREADY_EXISTS)
+    );
+
+    assert!(exists<MembershipRequestRegistry>(registry_addr), error::not_found(E_REQUEST_NOT_FOUND));
+    let requests = borrow_global_mut<MembershipRequestRegistry>(registry_addr);
+
+    if (aptos_framework::ordered_map::contains(&requests.address_to_request, &applicant_addr)) {
+        let request_id = *aptos_framework::ordered_map::borrow(&requests.address_to_request, &applicant_addr);
+        let existing = aptos_framework::ordered_map::borrow(&requests.requests, &request_id);
+        assert!(!(existing.status is RequestStatus::Pending), error::already_exists(E_REQUEST_ALREADY_PENDING));
+    };
+
+    let request_id = requests.counter;
+    requests.counter = requests.counter + 1;
+
+    let request = MembershipRequest {
+        requester: applicant_addr,
+        desired_role: role_from_u8(desired_role),
+        note,
+        status: RequestStatus::Pending,
+    };
+
+    aptos_framework::ordered_map::add(&mut requests.requests, request_id, request);
+    aptos_framework::ordered_map::upsert(&mut requests.address_to_request, applicant_addr, request_id);
+
+    event::emit(MembershipRequestedEvent {
+        request_id,
+        requester: applicant_addr,
+        role: desired_role,
+    });
+}
+
+/// Request membership using a community id resolved via RegistryHub
+public entry fun request_membership_for_community(
+    applicant: &signer,
+    hub_addr: address,
+    community_id: u64,
+    desired_role: u8,
+    note: vector<u8>,
+) acquires MembershipRegistry, MembershipRequestRegistry {
+    let registry_addr = registry_hub::members_registry_addr(hub_addr, community_id);
+    request_membership(applicant, registry_addr, desired_role, note);
+}
+
+/// Approve a pending membership request (Admin or Validator)
+public entry fun approve_membership(
+    approver: &signer,
+    request_id: u64,
+    registry_addr: address,
+) acquires MembershipRegistry, MembershipRequestRegistry, Member {
+    let approver_addr = signer::address_of(approver);
+
+    assert!(exists<MembershipRegistry>(registry_addr), error::not_found(1));
+
+    // Permissions: Admin or Validator
+    assert!(
+        is_admin_with_registry(approver, registry_addr) ||
+        has_role_with_registry(approver_addr, validator_role_u8(), registry_addr),
+        error::permission_denied(E_NOT_AUTHORIZED)
+    );
+
+    assert!(exists<MembershipRequestRegistry>(registry_addr), error::not_found(E_REQUEST_NOT_FOUND));
+    let requests = borrow_global_mut<MembershipRequestRegistry>(registry_addr);
+    assert!(aptos_framework::ordered_map::contains(&requests.requests, &request_id), error::not_found(E_REQUEST_NOT_FOUND));
+
+    let request = aptos_framework::ordered_map::borrow_mut(&mut requests.requests, &request_id);
+    assert!(request.status is RequestStatus::Pending, error::invalid_state(E_INVALID_REQUEST_STATUS));
+
+    let requester_addr = request.requester;
+    let desired_role = request.desired_role;
+
+    request.status = RequestStatus::Approved;
+    remove_request_mapping(&mut requests.address_to_request, requester_addr);
+
+    register_member_in_registry(registry_addr, requester_addr, desired_role);
+
+    event::emit(MembershipRequestApprovedEvent {
+        request_id,
+        approver: approver_addr,
+    });
+}
+
+/// Approve a membership request using a community id resolved via RegistryHub
+public entry fun approve_membership_for_community(
+    approver: &signer,
+    hub_addr: address,
+    community_id: u64,
+    request_id: u64,
+) acquires MembershipRegistry, MembershipRequestRegistry, Member {
+    let registry_addr = registry_hub::members_registry_addr(hub_addr, community_id);
+    approve_membership(approver, request_id, registry_addr);
+}
+
+/// Reject a pending membership request (Admin or Validator)
+public entry fun reject_membership(
+    approver: &signer,
+    request_id: u64,
+    registry_addr: address,
+) acquires Member, MembershipRegistry, MembershipRequestRegistry {
+    let approver_addr = signer::address_of(approver);
+
+    assert!(exists<MembershipRegistry>(registry_addr), error::not_found(1));
+
+    assert!(
+        is_admin_with_registry(approver, registry_addr) ||
+        has_role_with_registry(approver_addr, validator_role_u8(), registry_addr),
+        error::permission_denied(E_NOT_AUTHORIZED)
+    );
+
+    assert!(exists<MembershipRequestRegistry>(registry_addr), error::not_found(E_REQUEST_NOT_FOUND));
+    let requests = borrow_global_mut<MembershipRequestRegistry>(registry_addr);
+    assert!(aptos_framework::ordered_map::contains(&requests.requests, &request_id), error::not_found(E_REQUEST_NOT_FOUND));
+
+    let request = aptos_framework::ordered_map::borrow_mut(&mut requests.requests, &request_id);
+    assert!(request.status is RequestStatus::Pending, error::invalid_state(E_INVALID_REQUEST_STATUS));
+
+    request.status = RequestStatus::Rejected;
+    remove_request_mapping(&mut requests.address_to_request, request.requester);
+
+    event::emit(MembershipRequestRejectedEvent {
+        request_id,
+        approver: approver_addr,
+    });
+}
+
+/// Reject membership request using a community id resolved via RegistryHub
+public entry fun reject_membership_for_community(
+    approver: &signer,
+    hub_addr: address,
+    community_id: u64,
+    request_id: u64,
+) acquires Member, MembershipRegistry, MembershipRequestRegistry {
+    let registry_addr = registry_hub::members_registry_addr(hub_addr, community_id);
+    reject_membership(approver, request_id, registry_addr);
 }
 
 /// Bulk update member roles (admin only)
@@ -282,6 +487,43 @@ public entry fun revoke_membership(
     event::emit(MembershipRevokedEvent {
         member: member_addr,
     });
+}
+
+/// Get request ID for an address (view)
+#[view]
+public fun get_request_id_by_address(registry_addr: address, applicant_addr: address): option::Option<u64> {
+    if (!exists<MembershipRequestRegistry>(registry_addr)) {
+        return option::none()
+    };
+    let registry = borrow_global<MembershipRequestRegistry>(registry_addr);
+    if (aptos_framework::ordered_map::contains(&registry.address_to_request, &applicant_addr)) {
+        option::some(*aptos_framework::ordered_map::borrow(&registry.address_to_request, &applicant_addr))
+    } else {
+        option::none()
+    }
+}
+
+/// List pending membership requests (view)
+#[view]
+public fun list_membership_requests(registry_addr: address, status_filter: u8): vector<u64> {
+    let result = vector::empty<u64>();
+    if (!exists<MembershipRequestRegistry>(registry_addr)) {
+        return result
+    };
+    let registry = borrow_global<MembershipRequestRegistry>(registry_addr);
+    let keys = aptos_framework::ordered_map::keys(&registry.requests);
+    let len = vector::length(&keys);
+    let i = 0;
+    while (i < len) {
+        let request_id = *vector::borrow(&keys, i);
+        let request = aptos_framework::ordered_map::borrow(&registry.requests, &request_id);
+        let status_u8 = request_status_to_u8(request.status);
+        if (status_filter == 255 || status_filter == status_u8) {
+            vector::push_back(&mut result, request_id);
+        };
+        i = i + 1;
+    };
+    result
 }
 
 /// Check if an address is an admin
@@ -495,6 +737,36 @@ public fun initialize_for_test(admin: &signer) {
     if (!exists<MembershipRegistry>(admin_addr)) {
         initialize(admin);
     };
+}
+
+
+/// Helper: remove mapping once request resolved
+fun remove_request_mapping(mapping: &mut aptos_framework::ordered_map::OrderedMap<address, u64>, addr: address) {
+    if (aptos_framework::ordered_map::contains(mapping, &addr)) {
+        aptos_framework::ordered_map::remove(mapping, &addr);
+    };
+}
+
+/// Helper: add member directly to registry (without requiring admin signer)
+fun register_member_in_registry(registry_addr: address, member_addr: address, role: Role) acquires MembershipRegistry {
+    let registry = borrow_global_mut<MembershipRegistry>(registry_addr);
+    assert!(!aptos_framework::ordered_map::contains(&registry.registry, &member_addr), error::already_exists(E_MEMBER_ALREADY_EXISTS));
+    aptos_framework::ordered_map::add(&mut registry.registry, member_addr, role);
+    registry.counter = registry.counter + 1;
+
+    event::emit(MemberRegisteredEvent {
+        member: member_addr,
+        role: role_to_u8(role),
+    });
+}
+
+/// Helper: convert request status to u8
+fun request_status_to_u8(status: RequestStatus): u8 {
+    match (status) {
+        RequestStatus::Pending => 0,
+        RequestStatus::Approved => 1,
+        RequestStatus::Rejected => 2,
+    }
 }
 
 }

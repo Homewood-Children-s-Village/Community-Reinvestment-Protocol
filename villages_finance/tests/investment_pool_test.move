@@ -434,7 +434,7 @@ fun test_claim_repayment_single_investor(admin: signer, borrower: signer, invest
     // 2. join_pool(&investor, 0, 5000, admin_addr)
     // 3. finalize_funding(&admin, 0, admin_addr)
     // 4. repay_loan(&borrower, 0, admin_addr) - repays 5000 + 250 interest = 5250
-    // 5. claim_repayment(&investor, &admin, 0, admin_addr)
+    // 5. claim_repayment(&investor, 0, admin_addr)
     // 6. Verify investor received 5250 coins
     
     // For now, verify pool structure
@@ -514,8 +514,8 @@ fun test_claim_repayment_already_claimed(admin: signer, borrower: signer, invest
     // 1. Fund pool: join_pool(&investor, 0, 5000, admin_addr)
     // 2. Finalize: finalize_funding(&admin, 0, admin_addr)
     // 3. Repay: repay_loan(&borrower, 0, admin_addr)
-    // 4. Claim once: claim_repayment(&investor, &admin, 0, admin_addr)
-    // 5. Claim again (should fail): claim_repayment(&investor, &admin, 0, admin_addr)
+    // 4. Claim once: claim_repayment(&investor, 0, admin_addr)
+    // 5. Claim again (should fail): claim_repayment(&investor, 0, admin_addr)
     
     // For now, verify pool structure
     let (_, _, _, status, _, _, _) = investment_pool::get_pool(0, admin_addr);
@@ -550,7 +550,7 @@ fun test_claim_repayment_pool_not_completed(admin: signer, borrower: signer, inv
     );
     
     // Try to claim repayment from pool that's not completed - should fail
-    investment_pool::claim_repayment(&investor, &admin, 0, admin_addr);
+    investment_pool::claim_repayment(&investor, 0, admin_addr);
 }
 
 }

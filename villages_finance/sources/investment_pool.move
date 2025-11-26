@@ -160,7 +160,7 @@ public entry fun create_pool(
     interest_rate: u64,
     duration: u64,
     borrower: address,
-    pool_address: address,
+    _legacy_pool_address: address,
     fractional_shares_addr: address,
     compliance_registry_addr: address,
     members_registry_addr: address,
@@ -182,6 +182,9 @@ public entry fun create_pool(
     // Validate FA token admin configured
     assert!(token::is_initialized(token_admin_addr), error::invalid_argument(E_INVALID_REGISTRY));
     
+    // Legacy parameter retained for backward compatibility
+    let _ = _legacy_pool_address;
+
     // Validate project exists and is Approved (if project_registry_addr provided)
     // Note: For MVP, we'll validate project exists. For full validation, would need project_registry_addr parameter
     // This is a simplified check - in production, would validate project status
@@ -203,10 +206,8 @@ public entry fun create_pool(
     let pool_id = registry.pool_counter;
     registry.pool_counter = registry.pool_counter + 1;
     
-    // For MVP: Require pools to custody funds at the admin-controlled registry address.
-    // Future enhancements can attach a per-pool resource account signer via pool_signer_caps.
-    assert!(pool_address == admin_addr, error::invalid_argument(E_INVALID_REGISTRY));
-    let actual_pool_address = pool_address;
+    // Create per-pool resource account and signer capability
+    let pool_address = create_pool_vault(&mut registry.pool_signer_caps, admin, pool_id);
     
     let pool = InvestmentPool {
         pool_id,
@@ -223,12 +224,14 @@ public entry fun create_pool(
         total_repayment: 0,
         total_claimed: 0,
         borrower,
-        pool_address: actual_pool_address,
+        pool_address,
         fractional_shares_addr,
         compliance_registry_addr,
         members_registry_addr,
         token_admin_addr,
     };
+
+    fractional_asset::ensure_pool(pool_id, fractional_shares_addr);
     
     aptos_framework::big_ordered_map::add(&mut registry.pools, pool_id, pool);
 
@@ -247,7 +250,7 @@ public entry fun create_pool_from_project(
     project_id: u64,
     interest_rate: u64,
     duration: u64,
-    pool_address: address,
+    _legacy_pool_address: address,
     fractional_shares_addr: address,
     compliance_registry_addr: address,
     members_registry_addr: address,
@@ -302,9 +305,8 @@ public entry fun create_pool_from_project(
     let pool_id = registry.pool_counter;
     registry.pool_counter = registry.pool_counter + 1;
     
-    // For MVP: require funds stay under registry control
-    assert!(pool_address == pool_registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
-    let actual_pool_address = pool_address;
+    let _ = _legacy_pool_address;
+    let pool_address = create_pool_vault(&mut registry.pool_signer_caps, admin, pool_id);
     
     let pool = InvestmentPool {
         pool_id,
@@ -321,7 +323,7 @@ public entry fun create_pool_from_project(
         total_repayment: 0,
         total_claimed: 0,
         borrower,
-        pool_address: actual_pool_address,
+        pool_address,
         fractional_shares_addr,
         compliance_registry_addr,
         members_registry_addr,
@@ -329,6 +331,8 @@ public entry fun create_pool_from_project(
     };
     
     aptos_framework::big_ordered_map::add(&mut registry.pools, pool_id, pool);
+
+    fractional_asset::ensure_pool(pool_id, fractional_shares_addr);
     
     event::emit(PoolCreatedEvent {
         pool_id,
@@ -450,9 +454,7 @@ public entry fun finalize_funding(
     let pool_balance_amt = pool_balance(pool.pool_address, pool.token_admin_addr);
     assert!(pool_balance_amt >= total_funds, error::invalid_state(E_INSUFFICIENT_BALANCE));
     
-    // For MVP: withdraw using admin signer (pool_address == registry_addr)
-    assert!(pool.pool_address == registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
-    let asset = token::withdraw(admin, total_funds, pool.token_admin_addr);
+    let asset = withdraw_from_pool_vault(&mut registry.pool_signer_caps, pool_id, total_funds, pool.token_admin_addr);
     deposit_asset(pool.borrower, pool.token_admin_addr, asset);
     
     pool.status = PoolStatus::Funded;
@@ -513,7 +515,6 @@ public entry fun repay_loan(
 /// In production: Would use resource account signer capability
 public entry fun bulk_claim_repayments(
     investor: &signer,
-    admin: &signer,
     pool_ids: vector<u64>,
     registry_addr: address,
 ) acquires PoolRegistry {
@@ -560,11 +561,7 @@ public entry fun bulk_claim_repayments(
                         if (final_share > 0) {
                             let pool_balance_amt = pool_balance(pool.pool_address, pool.token_admin_addr);
                             if (pool_balance_amt >= final_share) {
-                                // Transfer assets - for MVP: pool_address must equal registry_addr
-                                assert!(pool.pool_address == registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
-                                let admin_addr = signer::address_of(admin);
-                                assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
-                                let asset = token::withdraw(admin, final_share, pool.token_admin_addr);
+                                let asset = withdraw_from_pool_vault(&mut registry.pool_signer_caps, pool_id, final_share, pool.token_admin_addr);
                                 deposit_asset(investor_addr, pool.token_admin_addr, asset);
                                 
                                 // Update total claimed
@@ -620,17 +617,14 @@ public entry fun bulk_claim_repayments(
 /// In production: Would use resource account signer capability
 public entry fun claim_repayment(
     investor: &signer,
-    admin: &signer,
     pool_id: u64,
     registry_addr: address,
 ) acquires PoolRegistry {
     let investor_addr = signer::address_of(investor);
-    let admin_addr = signer::address_of(admin);
     
     // Validate registry exists
     assert!(exists<PoolRegistry>(registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
     let registry = borrow_global_mut<PoolRegistry>(registry_addr);
-    assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
     
     assert!(aptos_framework::big_ordered_map::contains(&registry.pools, &pool_id), 
         error::not_found(E_POOL_NOT_FOUND));
@@ -675,9 +669,7 @@ public entry fun claim_repayment(
     assert!(pool_balance_amt >= final_share, error::invalid_state(E_INSUFFICIENT_BALANCE));
     
     // Transfer share to investor
-    // For MVP: pool_address must equal registry_addr to use admin signer
-    assert!(pool.pool_address == registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
-    let asset = token::withdraw(admin, final_share, pool.token_admin_addr);
+    let asset = withdraw_from_pool_vault(&mut registry.pool_signer_caps, pool_id, final_share, pool.token_admin_addr);
     deposit_asset(investor_addr, pool.token_admin_addr, asset);
     
     // Update total claimed
@@ -957,6 +949,58 @@ fun deposit_asset(recipient: address, token_admin_addr: address, asset: Fungible
     let metadata = token::get_metadata(token_admin_addr);
     let store = primary_fungible_store::ensure_primary_store_exists(recipient, metadata);
     fungible_asset::deposit(store, asset);
+}
+
+fun create_pool_vault(
+    signer_caps: &mut aptos_framework::big_ordered_map::BigOrderedMap<u64, account::SignerCapability>,
+    admin: &signer,
+    pool_id: u64,
+): address {
+    let seed = pool_seed(pool_id);
+    let (pool_signer, signer_cap) = account::create_resource_account(admin, seed);
+    let pool_addr = signer::address_of(&pool_signer);
+    aptos_framework::big_ordered_map::add(signer_caps, pool_id, signer_cap);
+    pool_addr
+}
+
+fun pool_seed(pool_id: u64): vector<u8> {
+    let bytes = vector::empty<u8>();
+    let byte0 = (pool_id % 256) as u8;
+    let temp1 = pool_id / 256;
+    let byte1 = (temp1 % 256) as u8;
+    let temp2 = temp1 / 256;
+    let byte2 = (temp2 % 256) as u8;
+    let temp3 = temp2 / 256;
+    let byte3 = (temp3 % 256) as u8;
+    let temp4 = temp3 / 256;
+    let byte4 = (temp4 % 256) as u8;
+    let temp5 = temp4 / 256;
+    let byte5 = (temp5 % 256) as u8;
+    let temp6 = temp5 / 256;
+    let byte6 = (temp6 % 256) as u8;
+    let temp7 = temp6 / 256;
+    let byte7 = (temp7 % 256) as u8;
+    vector::push_back(&mut bytes, byte0);
+    vector::push_back(&mut bytes, byte1);
+    vector::push_back(&mut bytes, byte2);
+    vector::push_back(&mut bytes, byte3);
+    vector::push_back(&mut bytes, byte4);
+    vector::push_back(&mut bytes, byte5);
+    vector::push_back(&mut bytes, byte6);
+    vector::push_back(&mut bytes, byte7);
+    bytes
+}
+
+fun withdraw_from_pool_vault(
+    signer_caps: &mut aptos_framework::big_ordered_map::BigOrderedMap<u64, account::SignerCapability>,
+    pool_id: u64,
+    amount: u64,
+    token_admin_addr: address,
+): FungibleAsset {
+    assert!(aptos_framework::big_ordered_map::contains(signer_caps, &pool_id), error::not_found(E_POOL_NOT_FOUND));
+    let cap_ref = aptos_framework::big_ordered_map::borrow(signer_caps, &pool_id);
+    let pool_signer = account::create_signer_with_capability(cap_ref);
+    token::withdraw(&pool_signer, amount, token_admin_addr)
 }
 
 #[test_only]

@@ -74,19 +74,19 @@ The codebase has been updated to:
 #### Changed Functions
 
 **`claim_repayment()`**
-- **Before**: `claim_repayment(investor: signer, pool_id: u64, registry_addr: address)`
-- **After**: `claim_repayment(investor: signer, admin: signer, pool_id: u64, registry_addr: address)`
-- **Impact**: Added `admin: signer` parameter for MVP (withdraws from pool_address using admin signer)
+- **Before**: `claim_repayment(investor: signer, admin: signer, pool_id: u64, registry_addr: address)`
+- **After**: `claim_repayment(investor: signer, pool_id: u64, registry_addr: address)`
+- **Impact**: Removed the `admin` signer requirement. Funds are released via per-pool resource-account capabilities.
 
 **`bulk_claim_repayments()`**
-- **Before**: `bulk_claim_repayments(investor: signer, pool_ids: vector<u64>, registry_addr: address)`
-- **After**: `bulk_claim_repayments(investor: signer, admin: signer, pool_ids: vector<u64>, registry_addr: address)`
-- **Impact**: Added `admin: signer` parameter for MVP
+- **Before**: `bulk_claim_repayments(investor: signer, admin: signer, pool_ids: vector<u64>, registry_addr: address)`
+- **After**: `bulk_claim_repayments(investor: signer, pool_ids: vector<u64>, registry_addr: address)`
+- **Impact**: Removed the `admin` signer requirement when batching repayment claims.
 
 #### Internal Changes
 
-- `pool_address` is now set to `registry_addr` during pool creation (MVP pattern)
-- All withdrawals from `pool_address` use admin signer when `pool_address == registry_addr`
+- Each pool now has a dedicated resource account whose signer capability is stored in `pool_signer_caps`.
+- Withdrawals during funding finalization or investor claims use the stored capability—no admin co-signer needed.
 
 ### Treasury Module (`treasury.move`)
 
@@ -95,19 +95,18 @@ The codebase has been updated to:
 #### Changed Functions
 
 **`withdraw()`**
-- **Before**: `withdraw(withdrawer: signer, amount: u64, treasury_addr: address)`
-- **After**: `withdraw(withdrawer: signer, admin: signer, amount: u64, treasury_addr: address)`
-- **Impact**: Added `admin: signer` parameter for MVP (withdraws from treasury_addr using admin signer)
+- **Before**: `withdraw(withdrawer: signer, admin: signer, amount: u64, treasury_addr: address)`
+- **After**: `withdraw(withdrawer: signer, amount: u64, treasury_addr: address)`
+- **Impact**: Removed the `admin` signer; the module uses its stored `TreasuryCapability` to transfer assets.
 
 **`transfer_to_pool()`**
-- **Before**: `transfer_to_pool(from: signer, pool_id: u64, amount: u64, pool_address: address, treasury_addr: address)`
-- **After**: `transfer_to_pool(from: signer, admin: signer, pool_id: u64, amount: u64, pool_address: address, treasury_addr: address)`
-- **Impact**: Added `admin: signer` parameter for MVP
+- **Before**: `transfer_to_pool(from: signer, admin: signer, pool_id: u64, amount: u64, pool_address: address, treasury_addr: address)`
+- **After**: `transfer_to_pool(from: signer, pool_id: u64, amount: u64, pool_address: address, treasury_addr: address)`
+- **Impact**: Removed the `admin` signer when forwarding treasury balances into investment pools.
 
 #### Internal Changes
 
-- `treasury_addr` must equal admin address for withdrawals (MVP pattern)
-- All withdrawals from `treasury_addr` use admin signer when `treasury_addr == admin_addr`
+- Withdrawals rely on the stored `TreasuryCapability`; no admin signer or address equality checks required.
 
 ### Rewards Module (`rewards.move`)
 
@@ -116,24 +115,24 @@ The codebase has been updated to:
 #### Changed Functions
 
 **`claim_rewards()`**
-- **Before**: `claim_rewards(claimer: signer, pool_id: u64, pool_registry_addr: address)`
-- **After**: `claim_rewards(claimer: signer, admin: signer, pool_id: u64, pool_registry_addr: address)`
-- **Impact**: Added `admin: signer` parameter for MVP
+- **Before**: `claim_rewards(claimer: signer, admin: signer, pool_id: u64, pool_registry_addr: address)`
+- **After**: `claim_rewards(claimer: signer, pool_id: u64, pool_registry_addr: address)`
+- **Impact**: Removed the `admin` signer; reward vaults are managed by per-pool resource accounts.
 
 **`unstake()`**
-- **Before**: `unstake(unstaker: signer, pool_id: u64, amount: u64, pool_registry_addr: address)`
-- **After**: `unstake(unstaker: signer, admin: signer, pool_id: u64, amount: u64, pool_registry_addr: address)`
-- **Impact**: Added `admin: signer` parameter for MVP
+- **Before**: `unstake(unstaker: signer, admin: signer, pool_id: u64, amount: u64, pool_registry_addr: address)`
+- **After**: `unstake(unstaker: signer, pool_id: u64, amount: u64, pool_registry_addr: address)`
+- **Impact**: Removed the `admin` signer requirement for unstaking.
 
 **`bulk_unstake()`**
-- **Before**: `bulk_unstake(unstaker: signer, unstakes: vector<StakeEntry>, pool_registry_addr: address)`
-- **After**: `bulk_unstake(unstaker: signer, admin: signer, unstakes: vector<StakeEntry>, pool_registry_addr: address)`
-- **Impact**: Added `admin: signer` parameter for MVP
+- **Before**: `bulk_unstake(unstaker: signer, admin: signer, unstakes: vector<StakeEntry>, pool_registry_addr: address)`
+- **After**: `bulk_unstake(unstaker: signer, unstakes: vector<StakeEntry>, pool_registry_addr: address)`
+- **Impact**: Removed the `admin` signer from batch unstake operations.
 
 #### Internal Changes
 
-- `pool_address` is now set to `pool_registry_addr` during initialization (MVP pattern)
-- All withdrawals from `pool.pool_address` use admin signer when `pool_address == pool_registry_addr`
+- Rewards pools now create dedicated resource accounts whose signer capabilities live inside `RewardsPool`.
+- Withdrawals from reward vaults happen via these capabilities—no admin signer involvement.
 
 ## Architecture Notes
 

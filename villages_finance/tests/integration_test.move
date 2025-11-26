@@ -212,7 +212,7 @@ fun test_treasury_flow(admin: signer, depositor: signer) {
     // Withdraw from shared treasury
     // Updated: add admin parameter
     let withdraw_amount = 2000;
-    treasury::withdraw(&depositor, &admin, withdraw_amount, admin_addr);
+    treasury::withdraw(&depositor, withdraw_amount, admin_addr);
     
     // Verify withdrawal
     let balance_after = treasury::get_balance(depositor_addr, admin_addr);

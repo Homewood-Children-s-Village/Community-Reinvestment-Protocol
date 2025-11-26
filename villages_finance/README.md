@@ -92,9 +92,26 @@ The platform uses a **registry pattern** where each module stores its state in a
 - **Time Token**: FA standard token representing volunteer hours (1 hour = 1 token)
 - **AptosCoin**: Native Aptos coin for deposits, investments, and repayments
 
+### Multi-Community Setup
+
+1. **Create a Registry Hub** – call `registry_hub::initialize` under the address that will coordinate multiple communities.
+2. **Instantiate per-community registries** – deploy membership, compliance, treasury, pool, rewards, and governance resources under community-specific resource accounts.
+3. **Register the community** – call `registry_hub::register_community` (or use `scripts/register_community.move`) to map a `community_id` to the addresses created in step 2.
+4. **Use community-aware entry points** – e.g., `members::request_membership_for_community` resolves the correct registry via the hub, while other modules accept addresses fetched from the hub’s view functions.
+
 ---
 
 ## Core Modules
+
+### 0. Registry Hub (`registry_hub.move`)
+
+**Purpose**: Stores per-community registry addresses so multiple communities can share the same code deployment.
+
+**Key Functions**:
+- `initialize()`: Creates a hub under the caller’s address.
+- `register_community()`: Maps a `community_id` to its members, compliance, treasury, pool, fractional-share, governance, and token vault addresses.
+- `update_community()`: Rotates any of the stored addresses.
+- View helpers like `members_registry_addr()` let frontends resolve addresses without redeploying contracts.
 
 ### 1. Members Module (`members.move`)
 
@@ -178,8 +195,8 @@ The platform uses a **registry pattern** where each module stores its state in a
 **Key Functions**:
 - `initialize()`: Create treasury
 - `deposit()`: Deposit AptosCoin to treasury (requires member + KYC)
-- `withdraw()`: Withdraw from treasury (requires admin signer for MVP)
-- `transfer_to_pool()`: Transfer funds to investment pool (requires admin signer for MVP)
+- `withdraw()`: Withdraw from treasury (self-service, membership validated)
+- `transfer_to_pool()`: Transfer funds to investment pool vaults
 - `get_balance()`: Get user balance (view)
 - `get_total_deposited()`: Get total treasury balance (view)
 
@@ -242,7 +259,7 @@ The platform uses a **registry pattern** where each module stores its state in a
 - `get_shares()`: Get share balance (view)
 - `get_total_shares()`: Get total shares for pool (view)
 
-**Storage**: `FractionalShares` object per pool tracking shares per address.
+**Storage**: Shared `FractionalSharesRegistry` maps each `pool_id` to its own share ledger, enabling multiple pools per deployment.
 
 ### 10. Investment Pool Module (`investment_pool.move`)
 
@@ -255,14 +272,14 @@ The platform uses a **registry pattern** where each module stores its state in a
 - `join_pool()`: Invest in pool (Member + KYC required)
 - `finalize_funding()`: Finalize when goal met (Admin only)
 - `repay_loan()`: Repay loan with interest (Borrower only)
-- `claim_repayment()`: Claim repayment share (Investor, requires admin signer for MVP)
+- `claim_repayment()`: Claim repayment share (investor self-service)
 - `bulk_claim_repayments()`: Batch claim operation
 - `mark_defaulted()`: Mark pool as defaulted (Admin only)
 - `get_pool()`: Get pool details (view)
 - `get_investor_portfolio()`: Get investor's portfolio (view)
 - `get_borrower_loans()`: Get borrower's loans (view)
 
-> **Tokenization note:** Pools currently require the staking/liquidity token specified by `token_admin_addr`. For the MVP implementation the pool address must match the admin/registry address so that the same signer can withdraw funds when finalizing, repaying, or fulfilling investor claims.
+> **Tokenization note:** Pools use dedicated resource accounts per pool to hold funds, allowing self-service withdrawals for investors without requiring admin co-signers. Each pool creates its own resource account during initialization.
 
 **Pool Status**:
 - `0` - Pending: Created but not yet active
@@ -315,9 +332,9 @@ The platform uses a **registry pattern** where each module stores its state in a
 **Key Functions**:
 - `initialize()`: Create rewards pool. Requires `token_admin_addr` pointing to the fungible asset used for staking/reward payouts.
 - `stake()`: Stake tokens in rewards pool
-- `unstake()`: Unstake tokens (requires admin signer for MVP)
+- `unstake()`: Unstake tokens directly from the pool vault
 - `distribute_rewards()`: Distribute rewards to pool
-- `claim_rewards()`: Claim pending rewards (requires admin signer for MVP)
+- `claim_rewards()`: Claim pending rewards (no admin co-signer)
 - `bulk_stake()`: Batch stake operation
 - `bulk_unstake()`: Batch unstake operation
 - `get_pending_rewards()`: Get pending rewards (view)
@@ -325,7 +342,7 @@ The platform uses a **registry pattern** where each module stores its state in a
 
 **Reward Debt Pattern**: Efficient calculation of proportional rewards without iterating through all stakers.
 
-> **Tokenization note:** Rewards staking now uses the community fungible asset created by `token.move`. Admins must initialize the token before calling `rewards::initialize`, and the pool address is constrained to the admin/registry address so the same signer can transfer assets out when processing claims or unstakes.
+> **Tokenization note:** Rewards staking now uses dedicated resource accounts per pool, allowing the module to move vault funds without borrowing an admin signer.
 
 ---
 
@@ -341,7 +358,29 @@ The platform uses a **registry pattern** where each module stores its state in a
    - User completes KYC through backend (Privy/Persona)
    - Backend verifies identity documents
 
-2. **Admin Whitelists Address** (Admin)
+2. **Prospective Member Submits On-Chain Request**
+   ```move
+   members::request_membership(
+       applicant: signer,
+       registry_addr: address, // or resolve via RegistryHub
+       role: u8,
+       note: vector<u8>,
+   )
+   ```
+   - Returns: `request_id`
+
+3. **Validator/Admin Reviews Request**
+   ```move
+   members::approve_membership(
+       validator: signer,
+       request_id: u64,
+       registry_addr: address,
+   )
+   // or members::reject_membership(...)
+   ```
+   - Validators can approve as long as they hold the validator role.
+
+4. **Admin Whitelists Address** (Admin)
    ```move
    compliance::whitelist_address(
        admin: signer,
@@ -349,7 +388,7 @@ The platform uses a **registry pattern** where each module stores its state in a
    )
    ```
 
-3. **Admin Registers Member** (Admin)
+5. **Admin Registers Member (optional direct registration)** (Admin)
    ```move
    members::register_member(
        admin: signer,
@@ -358,7 +397,7 @@ The platform uses a **registry pattern** where each module stores its state in a
    )
    ```
 
-4. **Member Accepts Membership** (Member)
+6. **Member Accepts Membership** (Member)
    ```move
    members::accept_membership(
        member: signer,
@@ -574,17 +613,16 @@ investment_pool::bulk_claim_repayments(
    ): u64
    ```
 
-3. **Withdraw from Treasury** (Depositor + Admin)
+3. **Withdraw from Treasury** (Depositor)
    ```move
    treasury::withdraw(
        withdrawer: signer,
-       admin: signer,  // Required for MVP
        amount: u64,
        treasury_addr: address,
    )
    ```
    - Validates sufficient balance
-   - Transfers coins back to withdrawer
+   - Transfers coins back to withdrawer without needing an admin co-signer
 
 **Result**: Funds safely stored in treasury, available for withdrawal.
 
@@ -871,16 +909,16 @@ aptos move run-script --compiled-script-path scripts/whitelist_address.move \
 - **Admin Capability**: Critical operations require admin capability resource
 - **KYC Compliance**: Financial operations require whitelist check
 
-### MVP Limitations
+### Self-Service Withdrawals
 
-**Address-Based Withdrawals**: For MVP simplicity, withdrawals from pool/treasury addresses require admin signer:
+**Resource Account Pattern**: All withdrawals use dedicated resource accounts with stored signer capabilities:
 
-- `investment_pool::claim_repayment()` - requires `admin: signer`
-- `treasury::withdraw()` - requires `admin: signer`
-- `rewards::claim_rewards()` - requires `admin: signer`
-- `rewards::unstake()` - requires `admin: signer`
+- `investment_pool::claim_repayment()` - investor self-service via pool vault capability
+- `treasury::withdraw()` - depositor self-service using treasury transfer_ref
+- `rewards::claim_rewards()` - claimer self-service via rewards vault capability
+- `rewards::unstake()` - staker self-service via rewards vault capability
 
-**Production Enhancement**: Use resource accounts with stored signer capabilities for decentralized withdrawals.
+**Security**: Each pool/treasury maintains its own resource account, enabling secure, decentralized withdrawals without requiring admin co-signers.
 
 ### Best Practices
 
@@ -911,18 +949,21 @@ aptos move run-script --compiled-script-path scripts/whitelist_address.move \
 
 **Rationale**: Aptos is migrating all tokens to FA standard. Custom tokens fully migrated; AptosCoin operations continue using Coin API until ecosystem migration completes.
 
-### MVP Address-Based Withdrawals
+### Resource Account Pattern for Vaults
 
-**Pattern**: `pool_address == registry_addr` (uses admin signer for withdrawals)
+**Pattern**: Each pool/treasury creates a dedicated resource account during initialization, storing the signer capability for self-service withdrawals.
 
 **Example**:
 ```move
-// In investment_pool.move
-assert!(pool.pool_address == registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
-let coins = coin::withdraw<aptos_coin::AptosCoin>(&admin, amount);
+// In investment_pool.move - pool creation
+let (pool_signer, signer_cap) = account::create_resource_account(admin, seed);
+aptos_framework::big_ordered_map::add(&mut registry.pool_signer_caps, pool_id, signer_cap);
+
+// In claim_repayment - self-service withdrawal
+let asset = withdraw_from_pool_vault(&mut registry.pool_signer_caps, pool_id, amount, token_admin_addr);
 ```
 
-**Production Path**: Each pool/treasury should have its own resource account with stored signer capabilities for secure, decentralized withdrawals.
+**Benefits**: Enables secure, decentralized withdrawals without requiring admin co-signers, improving user experience and reducing operational overhead.
 
 ### Registry Pattern
 

@@ -197,7 +197,6 @@ public entry fun deposit(
 /// In production: Would use resource account signer capability
 public entry fun withdraw(
     withdrawer: &signer,
-    admin: &signer,
     amount: u64,
     treasury_addr: address,
 ) acquires Treasury, TreasuryCapability {
@@ -221,12 +220,7 @@ public entry fun withdraw(
     aptos_framework::big_ordered_map::upsert(&mut treasury.balances, withdrawer_addr, balance - amount);
     treasury.total_deposited = treasury.total_deposited - amount;
     
-    // Transfer fungible assets back from treasury to withdrawer
-    // For MVP: treasury_addr must equal admin address to use admin signer
-    let admin_addr = signer::address_of(admin);
-    assert!(treasury_addr == admin_addr, error::invalid_argument(E_INVALID_REGISTRY));
-    assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
-    
+    // Transfer fungible assets back from treasury to withdrawer using stored capability
     let cap = borrow_global<TreasuryCapability>(treasury_addr);
     
     // Ensure primary store exists for treasury
@@ -289,11 +283,7 @@ public entry fun transfer_to_pool(
     aptos_framework::big_ordered_map::upsert(&mut treasury.balances, from_addr, balance - amount);
     treasury.total_deposited = treasury.total_deposited - amount;
     
-    // Transfer fungible assets from treasury to pool address
-    // For MVP: treasury_addr must equal from address to use from signer
-    assert!(treasury_addr == from_addr, error::invalid_argument(E_INVALID_REGISTRY));
-    // Note: In production, would validate admin or use resource account
-    
+    // Transfer fungible assets from treasury to pool address using stored capability
     let cap = borrow_global<TreasuryCapability>(treasury_addr);
     
     // Ensure primary store exists for treasury

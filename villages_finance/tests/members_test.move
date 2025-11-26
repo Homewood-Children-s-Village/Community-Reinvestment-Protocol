@@ -3,6 +3,7 @@ module villages_finance::members_test {
 
 use villages_finance::members;
 use std::signer;
+use std::vector;
 
 #[test(admin = @0x1, user1 = @0x2, user2 = @0x3)]
 fun test_initialize_and_register(admin: signer, user1: signer, user2: signer) {
@@ -91,6 +92,70 @@ fun test_get_role(admin: signer) {
     
     let role_opt_none = members::get_role(@0x999);
     assert!(std::option::is_none(&role_opt_none), 3);
+}
+
+#[test(admin = @0x1, validator = @0x2, applicant = @0x3)]
+fun test_membership_request_lifecycle(admin: signer, validator: signer, applicant: signer) {
+    members::initialize_for_test(&admin);
+    let admin_addr = signer::address_of(&admin);
+
+    // Bootstrap validator
+    members::register_member(&admin, signer::address_of(&validator), members::validator_role_u8());
+    members::accept_membership(&validator, admin_addr);
+
+    // Applicant submits request
+    members::request_membership(&applicant, admin_addr, 2, b"ready to help");
+    
+    // Get request_id from the request
+    let applicant_addr = signer::address_of(&applicant);
+    let request_id_opt = members::get_request_id_by_address(admin_addr, applicant_addr);
+    assert!(std::option::is_some(&request_id_opt), 0);
+    let request_id = *std::option::borrow(&request_id_opt);
+
+    // Validator approves
+    members::approve_membership(&validator, request_id, admin_addr);
+
+    assert!(members::has_role_with_registry(signer::address_of(&applicant), 2, admin_addr), 0);
+}
+
+#[test(admin = @0x1, validator = @0x2, applicant = @0x3)]
+#[expected_failure(abort_code = 327688, location = members)]
+fun test_membership_request_approval_requires_privilege(admin: signer, validator: signer, applicant: signer) {
+    members::initialize_for_test(&admin);
+    let admin_addr = signer::address_of(&admin);
+
+    members::request_membership(&applicant, admin_addr, 1, b"");
+    
+    // Get request_id from the request
+    let applicant_addr = signer::address_of(&applicant);
+    let request_id_opt = members::get_request_id_by_address(admin_addr, applicant_addr);
+    assert!(std::option::is_some(&request_id_opt), 0);
+    let request_id = *std::option::borrow(&request_id_opt);
+
+    // validator is not registered as validator yet, so this should fail
+    members::approve_membership(&validator, request_id, admin_addr);
+}
+
+#[test(admin = @0x1, validator = @0x2, applicant = @0x3)]
+fun test_membership_request_rejection(admin: signer, validator: signer, applicant: signer) {
+    members::initialize_for_test(&admin);
+    let admin_addr = signer::address_of(&admin);
+
+    members::register_member(&admin, signer::address_of(&validator), members::validator_role_u8());
+    members::accept_membership(&validator, admin_addr);
+
+    members::request_membership(&applicant, admin_addr, 1, b"");
+    
+    // Get request_id from the request
+    let applicant_addr = signer::address_of(&applicant);
+    let request_id_opt = members::get_request_id_by_address(admin_addr, applicant_addr);
+    assert!(std::option::is_some(&request_id_opt), 0);
+    let request_id = *std::option::borrow(&request_id_opt);
+    
+    members::reject_membership(&validator, request_id, admin_addr);
+
+    let pending = members::list_membership_requests(admin_addr, 0);
+    assert!(vector::length(&pending) == 0, 0);
 }
 
 }

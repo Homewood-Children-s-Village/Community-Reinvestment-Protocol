@@ -7,6 +7,7 @@ use aptos_framework::event;
 use aptos_framework::big_ordered_map;
 use aptos_framework::fungible_asset::{Self, FungibleAsset};
 use aptos_framework::primary_fungible_store;
+use aptos_framework::account;
 use villages_finance::event_history;
 use villages_finance::admin;
 use villages_finance::token;
@@ -43,6 +44,7 @@ struct RewardsPool has key {
     minimum_threshold: u64, // Minimum reward amount to claim
     pool_address: address, // Address where funds are held
     token_admin_addr: address, // FA admin controlling staking token
+    vault_signer_cap: account::SignerCapability,
 }
 
 // Events
@@ -86,8 +88,11 @@ public fun initialize(
     assert!(!exists<RewardsPool>(admin_addr), error::already_exists(1));
     
     assert!(token::is_initialized(token_admin_addr), error::invalid_argument(E_INVALID_REGISTRY));
-    assert!(pool_address == admin_addr, error::invalid_argument(E_INVALID_REGISTRY)); // MVP constraint
-    let actual_pool_address = pool_address;
+    let _ = pool_address; // Legacy parameter retained for compatibility
+
+    let seed = reward_pool_seed(pool_id);
+    let (vault_signer, signer_cap) = account::create_resource_account(admin, seed);
+    let actual_pool_address = signer::address_of(&vault_signer);
     
     move_to(admin, RewardsPool {
         pool_id,
@@ -97,6 +102,7 @@ public fun initialize(
         minimum_threshold,
         pool_address: actual_pool_address,
         token_admin_addr,
+        vault_signer_cap: signer_cap,
     });
 }
 
@@ -199,7 +205,6 @@ fun calculate_pending_rewards(
 /// In production: Would use resource account signer capability
 public entry fun claim_rewards(
     claimer: &signer,
-    admin: &signer,
     pool_id: u64,
     pool_registry_addr: address,
 ) acquires RewardsPool {
@@ -213,22 +218,21 @@ public entry fun claim_rewards(
     assert!(aptos_framework::big_ordered_map::contains(&pool.reward_data, &claimer_addr), 
         error::not_found(E_NO_REWARDS));
     
-    let data = aptos_framework::big_ordered_map::borrow_mut(&mut pool.reward_data, &claimer_addr);
-    let amount = data.pending_rewards;
-    assert!(amount > 0, error::invalid_argument(E_ZERO_AMOUNT));
-    assert!(amount >= pool.minimum_threshold, error::invalid_argument(E_BELOW_THRESHOLD));
+    // Extract amount and validate while borrow is active
+    let amount = {
+        let data = aptos_framework::big_ordered_map::borrow(&pool.reward_data, &claimer_addr);
+        let pending = data.pending_rewards;
+        assert!(pending > 0, error::invalid_argument(E_ZERO_AMOUNT));
+        assert!(pending >= pool.minimum_threshold, error::invalid_argument(E_BELOW_THRESHOLD));
+        pending
+    };
     
-    // Check pool has sufficient balance
-    let balance = pool_balance(pool.pool_address, pool.token_admin_addr);
-    assert!(balance >= amount, error::invalid_state(E_INSUFFICIENT_BALANCE));
-    
-    // Transfer assets to claimer (MVP: admin signer controls pool)
-    assert!(pool.pool_address == pool_registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
-    let admin_addr = signer::address_of(admin);
-    assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
-    let asset = token::withdraw(admin, amount, pool.token_admin_addr);
+    // Transfer assets to claimer via resource account capability
+    let asset = withdraw_from_rewards_vault(pool, amount);
     deposit_asset(claimer_addr, pool.token_admin_addr, asset);
     
+    // Update pending rewards after withdrawal
+    let data = aptos_framework::big_ordered_map::borrow_mut(&mut pool.reward_data, &claimer_addr);
     data.pending_rewards = 0;
 
     event::emit(RewardsClaimedEvent {
@@ -331,7 +335,6 @@ public entry fun stake(
 /// Unstake tokens from the rewards pool
 public entry fun unstake(
     unstaker: &signer,
-    admin: &signer,
     pool_id: u64,
     amount: u64,
     pool_registry_addr: address,
@@ -367,15 +370,8 @@ public entry fun unstake(
     // Update total staked
     pool.total_staked = pool.total_staked - amount;
     
-    // Transfer assets back to unstaker
-    let pool_balance_amt = pool_balance(pool.pool_address, pool.token_admin_addr);
-    assert!(pool_balance_amt >= amount, error::invalid_state(E_INSUFFICIENT_BALANCE));
-    
-    // For MVP: admin signer controls pool funds
-    let admin_addr = signer::address_of(admin);
-    assert!(pool.pool_address == pool_registry_addr, error::invalid_argument(E_INVALID_REGISTRY));
-    assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
-    let asset = token::withdraw(admin, amount, pool.token_admin_addr);
+    // Transfer assets back to unstaker through vault capability
+    let asset = withdraw_from_rewards_vault(pool, amount);
     deposit_asset(unstaker_addr, pool.token_admin_addr, asset);
     
     event::emit(UnstakedEvent {
@@ -644,6 +640,7 @@ public fun get_staked_amount(addr: address, pool_id: u64, pool_addr: address): u
 public fun initialize_for_test(admin: &signer, pool_id: u64, minimum_threshold: u64, pool_address: address, token_admin_addr: address) {
     admin::initialize_for_test(admin);
     let admin_addr = signer::address_of(admin);
+    let _ = pool_address;
     if (!exists<RewardsPool>(admin_addr)) {
         initialize(admin, pool_id, minimum_threshold, pool_address, token_admin_addr);
     };
@@ -661,6 +658,39 @@ fun deposit_asset(recipient: address, token_admin_addr: address, asset: Fungible
     let metadata = token::get_metadata(token_admin_addr);
     let store = primary_fungible_store::ensure_primary_store_exists(recipient, metadata);
     fungible_asset::deposit(store, asset);
+}
+
+fun reward_pool_seed(pool_id: u64): vector<u8> {
+    let bytes = vector::empty<u8>();
+    let byte0 = (pool_id % 256) as u8;
+    let temp1 = pool_id / 256;
+    let byte1 = (temp1 % 256) as u8;
+    let temp2 = temp1 / 256;
+    let byte2 = (temp2 % 256) as u8;
+    let temp3 = temp2 / 256;
+    let byte3 = (temp3 % 256) as u8;
+    let temp4 = temp3 / 256;
+    let byte4 = (temp4 % 256) as u8;
+    let temp5 = temp4 / 256;
+    let byte5 = (temp5 % 256) as u8;
+    let temp6 = temp5 / 256;
+    let byte6 = (temp6 % 256) as u8;
+    let temp7 = temp6 / 256;
+    let byte7 = (temp7 % 256) as u8;
+    vector::push_back(&mut bytes, byte0);
+    vector::push_back(&mut bytes, byte1);
+    vector::push_back(&mut bytes, byte2);
+    vector::push_back(&mut bytes, byte3);
+    vector::push_back(&mut bytes, byte4);
+    vector::push_back(&mut bytes, byte5);
+    vector::push_back(&mut bytes, byte6);
+    vector::push_back(&mut bytes, byte7);
+    bytes
+}
+
+fun withdraw_from_rewards_vault(pool: &mut RewardsPool, amount: u64): FungibleAsset {
+    let signer = account::create_signer_with_capability(&pool.vault_signer_cap);
+    token::withdraw(&signer, amount, pool.token_admin_addr)
 }
 
 }
