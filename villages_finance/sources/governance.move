@@ -88,7 +88,7 @@ struct Governance has key {
     resource_account_address: option::Option<address>, // Store resource account address for reference
 }
 
-/// Events
+// Events
 #[event]
 struct ProposalCreatedEvent has drop, store {
     proposal_id: u64,
@@ -272,6 +272,9 @@ public entry fun activate_proposal(
     gov_addr: address,
 ) acquires Governance {
     let admin_addr = signer::address_of(admin);
+    
+    // Verify admin role
+    assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
     
     // Validate registry exists
     assert!(exists<Governance>(gov_addr), error::invalid_argument(E_INVALID_REGISTRY));
@@ -508,13 +511,13 @@ public entry fun upgrade_module(
     });
 }
 
-/// Check if Governance exists (view function for cross-module access)
+/// Check if Governance exists (for cross-module access)
 #[view]
 public fun exists_governance(gov_addr: address): bool {
     exists<Governance>(gov_addr)
 }
 
-/// Get resource account address (view function)
+/// Get resource account address
 /// Returns the address of the resource account if it has been created
 #[view]
 public fun get_resource_account_address(gov_addr: address): option::Option<address> acquires Governance {
@@ -525,7 +528,7 @@ public fun get_resource_account_address(gov_addr: address): option::Option<addre
     *&governance.resource_account_address
 }
 
-/// Get proposal details (view function)
+/// Get proposal details
 #[view]
 public fun get_proposal(proposal_id: u64, gov_addr: address): (address, vector<u8>, u8, u64, u64, u64, u64, u8) {
     if (!exists<Governance>(gov_addr)) {
@@ -541,7 +544,7 @@ public fun get_proposal(proposal_id: u64, gov_addr: address): (address, vector<u
      voting_mechanism_to_u8(proposal.voting_mechanism))
 }
 
-/// List all proposals (view function)
+/// List all proposals
 /// Returns vector of proposal IDs, optionally filtered by status
 /// Note: For MVP, iterates through proposal_counter. For scale, consider pagination.
 #[view]
@@ -572,7 +575,7 @@ public fun list_proposals(gov_addr: address, status_filter: u8): vector<u64> {
     result
 }
 
-/// Get proposal summary with has_voted flag (view function)
+/// Get proposal summary with has_voted flag
 #[view]
 public fun get_proposal_summary(
     proposal_id: u64,
@@ -593,7 +596,7 @@ public fun get_proposal_summary(
      voting_mechanism_to_u8(proposal.voting_mechanism), has_voted)
 }
 
-/// Get voting power for a voter on a proposal (view function)
+/// Get voting power for a voter on a proposal
 #[view]
 public fun get_voting_power(
     voter_addr: address,

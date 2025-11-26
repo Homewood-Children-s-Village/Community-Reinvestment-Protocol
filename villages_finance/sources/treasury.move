@@ -46,7 +46,7 @@ struct Treasury has key {
     depositor_count: u64, // Track number of unique depositors
 }
 
-/// Events
+// Events
 #[event]
 struct DepositEvent has drop, store {
     depositor: address,
@@ -329,13 +329,13 @@ public entry fun transfer_to_pool(
     );
 }
 
-/// Check if Treasury exists (view function for cross-module access)
+/// Check if Treasury exists (for cross-module access)
 #[view]
 public fun exists_treasury(treasury_addr: address): bool {
     exists<Treasury>(treasury_addr)
 }
 
-/// Get balance for an address (view function)
+/// Get balance for an address
 #[view]
 public fun get_balance(addr: address, treasury_addr: address): u64 {
     if (!exists<Treasury>(treasury_addr)) {
@@ -349,7 +349,7 @@ public fun get_balance(addr: address, treasury_addr: address): u64 {
     }
 }
 
-/// Get total deposited amount (view function)
+/// Get total deposited amount
 #[view]
 public fun get_total_deposited(treasury_addr: address): u64 {
     if (!exists<Treasury>(treasury_addr)) {
@@ -359,7 +359,7 @@ public fun get_total_deposited(treasury_addr: address): u64 {
     treasury.total_deposited
 }
 
-/// Get depositor count (view function)
+/// Get depositor count
 #[view]
 public fun get_depositor_count(treasury_addr: address): u64 {
     if (!exists<Treasury>(treasury_addr)) {
@@ -369,7 +369,7 @@ public fun get_depositor_count(treasury_addr: address): u64 {
     vector::length(&aptos_framework::big_ordered_map::keys(&treasury.balances))
 }
 
-/// List top depositors (view function)
+/// List top depositors
 /// Returns top N depositors sorted by balance (descending)
 #[view]
 public fun list_top_depositors(treasury_addr: address, limit: u64): vector<DepositorEntry> {

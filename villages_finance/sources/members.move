@@ -33,7 +33,7 @@ struct MembershipRegistry has key {
     counter: u64,
 }
 
-/// Events
+// Events
 #[event]
 struct MemberRegisteredEvent has drop, store {
     member: address,
@@ -341,7 +341,7 @@ public fun has_role(addr: address, role: u8): bool {
     false
 }
 
-/// Get role of a member (view function - checks Member resource only)
+/// Get role of a member (checks Member resource only)
 #[view]
 public fun get_role(addr: address): option::Option<u8> {
     if (exists<Member>(addr)) {
@@ -351,7 +351,7 @@ public fun get_role(addr: address): option::Option<u8> {
     option::none()
 }
 
-/// Get role of a member with registry address (view function)
+/// Get role of a member with registry address
 #[view]
 public fun get_role_with_registry(addr: address, registry_addr: address): option::Option<u8> {
     if (exists<Member>(addr)) {
@@ -369,7 +369,7 @@ public fun get_role_with_registry(addr: address, registry_addr: address): option
     option::none()
 }
 
-/// List all members (view function)
+/// List all members
 /// Returns vector of member addresses, optionally filtered by role
 /// Note: OrderedMap supports iteration via keys_values()
 #[view]
@@ -401,7 +401,7 @@ public fun list_members(registry_addr: address, role_filter: u8): vector<address
     result
 }
 
-/// Get member count (view function)
+/// Get member count
 #[view]
 public fun get_member_count(registry_addr: address): u64 {
     if (!exists<MembershipRegistry>(registry_addr)) {
@@ -411,7 +411,7 @@ public fun get_member_count(registry_addr: address): u64 {
     aptos_framework::ordered_map::length(&registry.registry)
 }
 
-/// Get member count by role (view function)
+/// Get member count by role
 #[view]
 public fun get_member_count_by_role(registry_addr: address, role: u8): u64 {
     let count = 0;
@@ -453,7 +453,7 @@ public fun is_member_with_registry(addr: address, registry_addr: address): bool 
     false
 }
 
-/// Check if MembershipRegistry exists (view function for cross-module access)
+/// Check if MembershipRegistry exists (for cross-module access)
 #[view]
 public fun exists_membership_registry(registry_addr: address): bool {
     exists<MembershipRegistry>(registry_addr)

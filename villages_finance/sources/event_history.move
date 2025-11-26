@@ -159,7 +159,7 @@ public fun record_global_event(
     registry.event_counter = registry.event_counter + 1;
 }
 
-/// Get user event history (view function)
+/// Get user event history
 #[view]
 public fun get_user_event_history(
     user_addr: address,
@@ -192,7 +192,7 @@ public fun get_user_event_history(
     result
 }
 
-/// Get global event history (view function)
+/// Get global event history
 #[view]
 public fun get_global_event_history(
     registry_addr: address,
@@ -225,7 +225,7 @@ public fun get_global_event_history(
     result
 }
 
-/// Get event count for a user (view function)
+/// Get event count for a user
 #[view]
 public fun get_user_event_count(user_addr: address): u64 {
     if (!exists<UserEventHistory>(user_addr)) {

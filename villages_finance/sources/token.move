@@ -23,7 +23,7 @@ struct MintCapability has key, store {
     transfer_ref: TransferRef,
 }
 
-/// Events
+// Events
 #[event]
 struct MintedEvent has drop, store {
     to: address,
@@ -162,7 +162,7 @@ public fun get_asset_type(admin_addr: address): address acquires MintCapability 
     object::object_address(&get_metadata(admin_addr))
 }
 
-/// Get balance for an address (view function for governance voting)
+/// Get balance for an address (for governance voting)
 #[view]
 public fun get_balance(addr: address, admin_addr: address): u64 acquires MintCapability {
     if (!exists<MintCapability>(admin_addr)) {
@@ -172,7 +172,7 @@ public fun get_balance(addr: address, admin_addr: address): u64 acquires MintCap
     primary_fungible_store::balance(addr, metadata)
 }
 
-/// Get total supply (view function)
+/// Get total supply
 #[view]
 public fun get_total_supply(admin_addr: address): u64 acquires MintCapability {
     if (!exists<MintCapability>(admin_addr)) {

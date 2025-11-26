@@ -19,7 +19,7 @@ struct FractionalShares has key {
     total_shares: u64,
 }
 
-/// Events
+// Events
 #[event]
 struct SharesMintedEvent has drop, store {
     pool_id: u64,
@@ -167,7 +167,7 @@ public entry fun transfer_shares(
     });
 }
 
-/// Get shares for an address (view function)
+/// Get shares for an address
 #[view]
 public fun get_shares(addr: address, pool_id: u64, shares_addr: address): u64 {
     if (!exists<FractionalShares>(shares_addr)) {
@@ -184,7 +184,7 @@ public fun get_shares(addr: address, pool_id: u64, shares_addr: address): u64 {
     }
 }
 
-/// Get total shares for a pool (view function)
+/// Get total shares for a pool
 #[view]
 public fun get_total_shares(pool_id: u64, shares_addr: address): u64 {
     if (!exists<FractionalShares>(shares_addr)) {
@@ -197,7 +197,7 @@ public fun get_total_shares(pool_id: u64, shares_addr: address): u64 {
     shares_obj.total_shares
 }
 
-/// Check if FractionalShares exists (view function for cross-module access)
+/// Check if FractionalShares exists (for cross-module access)
 #[view]
 public fun exists_fractional_shares(shares_addr: address): bool {
     exists<FractionalShares>(shares_addr)

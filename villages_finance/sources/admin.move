@@ -25,7 +25,7 @@ struct ModulePause has key {
     paused_modules: aptos_framework::ordered_map::OrderedMap<vector<u8>, bool>,
 }
 
-/// Events
+// Events
 #[event]
 struct ModulePausedEvent has drop, store {
     module_name: vector<u8>,
@@ -169,7 +169,7 @@ public fun is_module_paused(module_name: vector<u8>, admin_addr: address): bool 
     aptos_framework::ordered_map::contains(&pause_state.paused_modules, &module_name)
 }
 
-/// List all paused modules (view function)
+/// List all paused modules
 #[view]
 public fun list_paused_modules(admin_addr: address): vector<vector<u8>> {
     let result = vector::empty<vector<u8>>();
@@ -282,7 +282,7 @@ public entry fun emergency_pause_all(
     log_admin_action(admin_addr_check, b"emergency_pause_all", admin_addr);
 }
 
-/// Get admin address (view function)
+/// Get admin address
 #[view]
 public fun get_admin_address(admin_addr: address): option::Option<address> {
     if (exists<AdminCapability>(admin_addr)) {

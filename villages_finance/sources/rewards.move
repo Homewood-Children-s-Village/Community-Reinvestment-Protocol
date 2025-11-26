@@ -44,7 +44,7 @@ struct RewardsPool has key {
     pool_address: address, // Address where reward funds are held
 }
 
-/// Events
+// Events
 #[event]
 struct RewardsDistributedEvent has drop, store {
     pool_id: u64,
@@ -391,7 +391,7 @@ public entry fun unstake(
     );
 }
 
-/// Get pending rewards (view function)
+/// Get pending rewards
 #[view]
 public fun get_pending_rewards(addr: address, pool_id: u64, pool_addr: address): u64 {
     calculate_pending_rewards(addr, pool_id, pool_addr)
@@ -619,7 +619,7 @@ public entry fun bulk_unstake(
     // In production, could emit summary event
 }
 
-/// Get staked amount for a user (view function)
+/// Get staked amount for a user
 #[view]
 public fun get_staked_amount(addr: address, pool_id: u64, pool_addr: address): u64 {
     if (!exists<RewardsPool>(pool_addr)) {

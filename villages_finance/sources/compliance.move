@@ -18,7 +18,7 @@ struct ComplianceRegistry has key {
     counter: u64,
 }
 
-/// Events
+// Events
 #[event]
 struct AddressWhitelistedEvent has drop, store {
     address: address,
@@ -162,7 +162,7 @@ public entry fun remove_from_whitelist(
     });
 }
 
-/// Check if an address is whitelisted (view function)
+/// Check if an address is whitelisted
 #[view]
 public fun is_whitelisted(addr: address, registry_addr: address): bool {
     if (!exists<ComplianceRegistry>(registry_addr)) {
@@ -172,7 +172,7 @@ public fun is_whitelisted(addr: address, registry_addr: address): bool {
     aptos_framework::ordered_map::contains(&registry.whitelist, &addr)
 }
 
-/// List all whitelisted addresses (view function)
+/// List all whitelisted addresses
 #[view]
 public fun list_whitelisted_addresses(registry_addr: address): vector<address> {
     let result = vector::empty<address>();
@@ -183,7 +183,7 @@ public fun list_whitelisted_addresses(registry_addr: address): vector<address> {
     aptos_framework::ordered_map::keys(&registry.whitelist)
 }
 
-/// Get total number of whitelisted addresses (view function)
+/// Get total number of whitelisted addresses
 #[view]
 public fun get_whitelist_count(registry_addr: address): u64 {
     if (!exists<ComplianceRegistry>(registry_addr)) {
@@ -193,7 +193,7 @@ public fun get_whitelist_count(registry_addr: address): u64 {
     registry.counter
 }
 
-/// Check if ComplianceRegistry exists (view function for cross-module access)
+/// Check if ComplianceRegistry exists (for cross-module access)
 #[view]
 public fun exists_compliance_registry(registry_addr: address): bool {
     exists<ComplianceRegistry>(registry_addr)

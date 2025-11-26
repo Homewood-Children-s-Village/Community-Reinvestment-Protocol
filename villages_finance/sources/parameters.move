@@ -41,7 +41,7 @@ struct ParameterChange has store {
     timestamp: u64,
 }
 
-/// Events
+// Events
 #[event]
 struct ParameterUpdatedEvent has drop, store {
     parameter_name: vector<u8>,
@@ -150,7 +150,7 @@ public entry fun update_parameter_via_governance(
     );
 }
 
-/// Get parameter value (view function)
+/// Get parameter value
 #[view]
 public fun get_parameter(parameter_name: vector<u8>, registry_addr: address): option::Option<u64> {
     if (!exists<ParameterRegistry>(registry_addr)) {
@@ -164,7 +164,7 @@ public fun get_parameter(parameter_name: vector<u8>, registry_addr: address): op
     }
 }
 
-/// List all parameters (view function)
+/// List all parameters
 #[view]
 public fun list_parameters(registry_addr: address): vector<ParameterEntry> {
     let result = vector::empty<ParameterEntry>();

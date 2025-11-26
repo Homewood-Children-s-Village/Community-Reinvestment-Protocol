@@ -70,7 +70,7 @@ struct InvestmentPool has key, store {
     members_registry_addr: address, // For member checks
 }
 
-/// Events
+// Events
 #[event]
 struct PoolCreatedEvent has drop, store {
     pool_id: u64,
@@ -715,15 +715,17 @@ public entry fun mark_defaulted(
     assert!(aptos_framework::big_ordered_map::contains(&registry.pools, &pool_id), 
         error::not_found(E_POOL_NOT_FOUND));
     
-    let pool = aptos_framework::big_ordered_map::borrow_mut(&mut registry.pools, &pool_id);
+    // Use remove-modify-insert pattern for variable-sized value type (InvestmentPool contains nested BigOrderedMaps)
+    let pool = aptos_framework::big_ordered_map::remove(&mut registry.pools, &pool_id);
     pool.status = PoolStatus::Defaulted;
+    aptos_framework::big_ordered_map::add(&mut registry.pools, pool_id, pool);
 
     event::emit(PoolDefaultedEvent {
         pool_id,
     });
 }
 
-/// Get pool details (view function)
+/// Get pool details
 #[view]
 public fun get_pool(pool_id: u64, registry_addr: address): (u64, u64, u64, u8, u64, u64, address) {
     if (!exists<PoolRegistry>(registry_addr)) {
@@ -739,7 +741,7 @@ public fun get_pool(pool_id: u64, registry_addr: address): (u64, u64, u64, u8, u
      pool.config.interest_rate, pool.config.duration, pool.borrower)
 }
 
-/// Get investor contribution (view function)
+/// Get investor contribution
 #[view]
 public fun get_contribution(
     investor_addr: address,
@@ -761,7 +763,7 @@ public fun get_contribution(
     }
 }
 
-/// Get total claimed amount (view function)
+/// Get total claimed amount
 #[view]
 public fun get_total_claimed(pool_id: u64, registry_addr: address): u64 {
     if (!exists<PoolRegistry>(registry_addr)) {
@@ -775,7 +777,7 @@ public fun get_total_claimed(pool_id: u64, registry_addr: address): u64 {
     pool.total_claimed
 }
 
-/// Get unclaimed repayment amount (view function)
+/// Get unclaimed repayment amount
 #[view]
 public fun get_unclaimed_repayment(pool_id: u64, registry_addr: address): u64 {
     if (!exists<PoolRegistry>(registry_addr)) {
@@ -793,7 +795,7 @@ public fun get_unclaimed_repayment(pool_id: u64, registry_addr: address): u64 {
     }
 }
 
-/// List all pools (view function)
+/// List all pools
 /// Returns vector of pool IDs, optionally filtered by status
 /// Note: For MVP, iterates through pool_counter. For scale, consider pagination.
 #[view]
@@ -824,7 +826,7 @@ public fun list_pools(registry_addr: address, status_filter: u8): vector<u64> {
     result
 }
 
-/// Get pool summary with additional fields (view function)
+/// Get pool summary with additional fields
 #[view]
 public fun get_pool_summary(pool_id: u64, registry_addr: address): (u64, u64, u64, u8, u64, u64, address, u64, u64) {
     if (!exists<PoolRegistry>(registry_addr)) {
@@ -841,7 +843,7 @@ public fun get_pool_summary(pool_id: u64, registry_addr: address): (u64, u64, u6
      pool.total_claimed, pool.total_repayment)
 }
 
-/// Get pools for a project (view function)
+/// Get pools for a project
 /// Returns vector of pool IDs associated with a specific project
 #[view]
 public fun get_pools_for_project(project_id: u64, registry_addr: address): vector<u64> {
@@ -864,7 +866,7 @@ public fun get_pools_for_project(project_id: u64, registry_addr: address): vecto
     result
 }
 
-/// Get investor portfolio (view function)
+/// Get investor portfolio
 /// Returns vector of (pool_id, contribution, shares, pool_status) tuples for an investor
 #[view]
 public fun get_investor_portfolio(investor_addr: address, registry_addr: address): vector<PortfolioEntry> {
@@ -896,7 +898,7 @@ public fun get_investor_portfolio(investor_addr: address, registry_addr: address
     result
 }
 
-/// Get borrower loans (view function)
+/// Get borrower loans
 /// Returns vector of (pool_id, amount_borrowed, status, amount_repaid) tuples for a borrower
 #[view]
 public fun get_borrower_loans(borrower: address, registry_addr: address): vector<LoanEntry> {

@@ -45,7 +45,7 @@ struct ProjectRegistry has key {
     project_counter: u64,
 }
 
-/// Events
+// Events
 #[event]
 struct ProjectProposedEvent has drop, store {
     project_id: u64,
@@ -151,10 +151,12 @@ public entry fun approve_project(
     assert!(aptos_framework::big_ordered_map::contains(&registry.projects, &project_id), 
         error::not_found(E_PROJECT_NOT_FOUND));
     
-    let project = aptos_framework::big_ordered_map::borrow_mut(&mut registry.projects, &project_id);
+    // Use remove-modify-insert pattern for variable-sized value type (Project contains vector<u8>)
+    let project = aptos_framework::big_ordered_map::remove(&mut registry.projects, &project_id);
     assert!(project.status is ProjectStatus::Proposed, error::invalid_state(E_INVALID_STATUS));
     
     project.status = ProjectStatus::Approved;
+    aptos_framework::big_ordered_map::add(&mut registry.projects, project_id, project);
 
     event::emit(ProjectApprovedEvent {
         project_id,
@@ -181,11 +183,13 @@ public entry fun update_status(
     assert!(aptos_framework::big_ordered_map::contains(&registry.projects, &project_id), 
         error::not_found(E_PROJECT_NOT_FOUND));
     
-    let project = aptos_framework::big_ordered_map::borrow_mut(&mut registry.projects, &project_id);
+    // Use remove-modify-insert pattern for variable-sized value type (Project contains vector<u8>)
+    let project = aptos_framework::big_ordered_map::remove(&mut registry.projects, &project_id);
     let old_status = project.status;
     let old_status_u8 = status_to_u8(old_status);
     
     project.status = status_from_u8(new_status);
+    aptos_framework::big_ordered_map::add(&mut registry.projects, project_id, project);
 
     event::emit(ProjectStatusUpdatedEvent {
         project_id,
@@ -195,7 +199,7 @@ public entry fun update_status(
     });
 }
 
-/// Get project details (view function)
+/// Get project details
 #[view]
 public fun get_project(project_id: u64, registry_addr: address): (address, vector<u8>, u64, u64, bool, u8, u64) {
     if (!exists<ProjectRegistry>(registry_addr)) {
@@ -210,7 +214,7 @@ public fun get_project(project_id: u64, registry_addr: address): (address, vecto
      project.is_grant, status_to_u8(project.status), project.created_at)
 }
 
-/// List all projects (view function)
+/// List all projects
 /// Returns vector of project IDs, optionally filtered by status
 /// Note: For MVP, iterates through project_counter. For scale, consider pagination.
 #[view]
@@ -241,7 +245,7 @@ public fun list_projects(registry_addr: address, status_filter: u8): vector<u64>
     result
 }
 
-/// List projects by proposer (view function)
+/// List projects by proposer
 /// Returns vector of project IDs created by a specific proposer
 #[view]
 public fun list_projects_by_proposer(proposer: address, registry_addr: address): vector<u64> {
@@ -264,7 +268,7 @@ public fun list_projects_by_proposer(proposer: address, registry_addr: address):
     result
 }
 
-/// Get borrower projects (view function)
+/// Get borrower projects
 /// Returns vector of project IDs for a specific borrower/proposer
 /// Note: This is an alias for list_projects_by_proposer for clarity
 #[view]
@@ -272,13 +276,13 @@ public fun get_borrower_projects(borrower: address, registry_addr: address): vec
     list_projects_by_proposer(borrower, registry_addr)
 }
 
-/// Check if ProjectRegistry exists (view function for cross-module access)
+/// Check if ProjectRegistry exists (for cross-module access)
 #[view]
 public fun exists_project_registry(registry_addr: address): bool {
     exists<ProjectRegistry>(registry_addr)
 }
 
-/// Check if project exists (view function for cross-module access)
+/// Check if project exists (for cross-module access)
 #[view]
 public fun project_exists(project_id: u64, registry_addr: address): bool {
     if (!exists<ProjectRegistry>(registry_addr)) {
@@ -288,14 +292,14 @@ public fun project_exists(project_id: u64, registry_addr: address): bool {
     aptos_framework::big_ordered_map::contains(&registry.projects, &project_id)
 }
 
-/// Get project target_usdc (view function for cross-module access)
+/// Get project target_usdc (for cross-module access)
 #[view]
 public fun get_project_target_usdc(project_id: u64, registry_addr: address): u64 {
     let (_, _, target_usdc, _, _, _, _) = get_project(project_id, registry_addr);
     target_usdc
 }
 
-/// Get project proposer (view function for cross-module access)
+/// Get project proposer (for cross-module access)
 #[view]
 public fun get_project_proposer(project_id: u64, registry_addr: address): address {
     let (proposer, _, _, _, _, _, _) = get_project(project_id, registry_addr);

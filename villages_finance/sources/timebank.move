@@ -44,7 +44,7 @@ struct TimeBank has key {
     request_counter: u64,
 }
 
-/// Events
+// Events
 #[event]
 struct RequestCreatedEvent has drop, store {
     request_id: u64,
@@ -185,7 +185,8 @@ public entry fun approve_request(
     assert!(aptos_framework::big_ordered_map::contains(&bank.requests, &request_id), 
         error::not_found(E_REQUEST_NOT_FOUND));
     
-    let request = aptos_framework::big_ordered_map::borrow_mut(&mut bank.requests, &request_id);
+    // Use remove-modify-insert pattern to avoid borrow_mut issues with size hints
+    let request = aptos_framework::big_ordered_map::remove(&mut bank.requests, &request_id);
     assert!(request.status is RequestStatus::Pending, error::invalid_state(E_INVALID_STATUS));
     
     // Check compliance/KYC before minting
@@ -194,16 +195,21 @@ public entry fun approve_request(
         error::permission_denied(1) // E_NOT_WHITELISTED
     );
     
+    // Store values before modifying
+    let requester_addr = request.requester;
+    let hours = request.hours;
+    
     // Update status
     request.status = RequestStatus::Approved;
+    aptos_framework::big_ordered_map::add(&mut bank.requests, request_id, request);
     
     // Mint TimeTokens using FA standard
-    time_token::mint(validator, request.requester, request.hours, time_token_admin_addr);
+    time_token::mint(validator, requester_addr, hours, time_token_admin_addr);
 
     event::emit(RequestApprovedEvent {
         request_id,
         approver: validator_addr,
-        hours: request.hours,
+        hours,
     });
 }
 
@@ -234,11 +240,13 @@ public entry fun reject_request(
     assert!(aptos_framework::big_ordered_map::contains(&bank.requests, &request_id), 
         error::not_found(E_REQUEST_NOT_FOUND));
     
-    let request = aptos_framework::big_ordered_map::borrow_mut(&mut bank.requests, &request_id);
+    // Use remove-modify-insert pattern to avoid borrow_mut issues with size hints
+    let request = aptos_framework::big_ordered_map::remove(&mut bank.requests, &request_id);
     assert!(request.status is RequestStatus::Pending, error::invalid_state(E_INVALID_STATUS));
     
     let requester_addr = request.requester;
     request.status = RequestStatus::Rejected;
+    aptos_framework::big_ordered_map::add(&mut bank.requests, request_id, request);
 
     event::emit(RequestRejectedEvent {
         request_id,
@@ -258,7 +266,7 @@ public entry fun reject_request(
     );
 }
 
-/// Get request details (view function)
+/// Get request details
 #[view]
 public fun get_request(request_id: u64, bank_addr: address): (address, u64, u64, u8, u64) {
     if (!exists<TimeBank>(bank_addr)) {
@@ -279,7 +287,7 @@ public fun get_request(request_id: u64, bank_addr: address): (address, u64, u64,
     (request.requester, request.hours, request.activity_id, status_u8, request.created_at)
 }
 
-/// List all requests (view function)
+/// List all requests
 /// Returns vector of request IDs, optionally filtered by status
 /// Note: For MVP, iterates through request_counter. For scale, consider pagination.
 #[view]
@@ -316,7 +324,7 @@ public fun list_requests(bank_addr: address, status_filter: u8): vector<u64> {
     result
 }
 
-/// List requests by member (view function)
+/// List requests by member
 /// Returns vector of request IDs created by a specific volunteer
 #[view]
 public fun list_requests_by_member(member: address, bank_addr: address): vector<u64> {
@@ -369,22 +377,26 @@ public entry fun bulk_approve_requests(
         if (aptos_framework::big_ordered_map::contains(&bank.requests, &request_id)) {
             let request = aptos_framework::big_ordered_map::borrow_mut(&mut bank.requests, &request_id);
             if (request.status is RequestStatus::Pending) {
+                // Store values before modifying
+                let requester_addr = request.requester;
+                let hours = request.hours;
+                
                 request.status = RequestStatus::Approved;
                 
                 // Mint Time Tokens using FA standard
-                time_token::mint(validator, request.requester, request.hours, time_token_admin_addr);
+                time_token::mint(validator, requester_addr, hours, time_token_admin_addr);
                 
                 event::emit(RequestApprovedEvent {
                     request_id,
                     approver: validator_addr,
-                    hours: request.hours,
+                    hours,
                 });
                 
                 // Record in event history
                 event_history::record_user_event(
-                    request.requester,
+                    requester_addr,
                     event_history::event_type_request_approved(),
-                    option::some(request.hours),
+                    option::some(hours),
                     option::none(),
                     option::none(),
                     option::some(request_id),
@@ -466,7 +478,7 @@ public entry fun bulk_reject_requests(
     // In production, could emit summary event with rejected_count and failed_ids
 }
 
-/// Get volunteer statistics (view function)
+/// Get volunteer statistics
 /// Returns (total_requests, approved_hours, pending_requests, total_hours_earned)
 #[view]
 public fun get_volunteer_stats(member: address, bank_addr: address): (u64, u64, u64, u64) {

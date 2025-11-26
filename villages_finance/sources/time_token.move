@@ -25,7 +25,7 @@ struct MintCapability has key, store {
     transfer_ref: TransferRef,
 }
 
-/// Events
+// Events
 #[event]
 struct TimeTokenMintedEvent has drop, store {
     recipient: address,
