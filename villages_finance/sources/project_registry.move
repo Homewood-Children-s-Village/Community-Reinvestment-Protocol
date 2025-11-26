@@ -69,14 +69,17 @@ struct ProjectStatusUpdatedEvent has drop, store {
 }
 
 /// Initialize project registry
-/// Initialize project registry
 /// Idempotent: safe to call multiple times
+/// Note: Uses new_with_type_size_hints because Project contains vector<u8> (variable-sized)
 public fun initialize(admin: &signer) {
     let admin_addr = signer::address_of(admin);
     // Explicit check for idempotency - no assert, just conditional creation
     if (!exists<ProjectRegistry>(admin_addr)) {
         move_to(admin, ProjectRegistry {
-            projects: aptos_framework::big_ordered_map::new(),
+            // Use new_with_type_size_hints for variable-sized value type (Project contains vector<u8>)
+            // Size calculation: address (16) + 2 u64s (16) + bool (1) + enum (1) + vector<u8> (50-200) + overhead = ~100-300 bytes
+            // Increased max to 2048 to accommodate larger IPFS CIDs
+            projects: aptos_framework::big_ordered_map::new_with_type_size_hints<u64, Project>(8, 8, 100, 2048),
             project_counter: 0,
         });
     };

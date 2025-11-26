@@ -4,10 +4,12 @@ use std::signer;
 use std::error;
 use std::vector;
 use std::option;
+use std::string;
 use aptos_framework::event;
 use aptos_framework::big_ordered_map;
-use aptos_framework::coin::{Self, Coin};
+use aptos_framework::fungible_asset::{Self, Metadata, MintRef, TransferRef};
 use aptos_framework::primary_fungible_store;
+use aptos_framework::object::{Self, Object};
 use villages_finance::members;
 use villages_finance::compliance;
 use villages_finance::registry_config;
@@ -28,6 +30,13 @@ const E_NOT_AUTHORIZED: u64 = 8;
 struct DepositorEntry has store {
     addr: address,
     balance: u64,
+}
+
+/// Treasury capability for FA operations
+struct TreasuryCapability has key, store {
+    metadata: Object<Metadata>,
+    mint_ref: MintRef,
+    transfer_ref: TransferRef,
 }
 
 /// Treasury object storing balances per user
@@ -57,16 +66,50 @@ struct TransferToPoolEvent has drop, store {
     amount: u64,
 }
 
-/// Initialize treasury
-public fun initialize(admin: &signer) {
+#[event]
+struct MintedEvent has drop, store {
+    to: address,
+    amount: u64,
+}
+
+/// Initialize treasury with FA metadata
+public fun initialize(admin: &signer, name: vector<u8>, symbol: vector<u8>, decimals: u8, description: vector<u8>) {
     let admin_addr = signer::address_of(admin);
     assert!(!exists<Treasury>(admin_addr), error::already_exists(1));
     
-        move_to(admin, Treasury {
-            balances: aptos_framework::big_ordered_map::new(),
-            total_deposited: 0,
-            depositor_count: 0,
-        });
+    // Create object for the fungible asset
+    let constructor_ref = &object::create_named_object(admin, symbol);
+    
+    // Create the fungible asset
+    primary_fungible_store::create_primary_store_enabled_fungible_asset(
+        constructor_ref,
+        option::none(), // max_supply
+        string::utf8(name),
+        string::utf8(symbol),
+        decimals,
+        string::utf8(b""), // icon_uri - empty for MVP
+        string::utf8(description), // project_uri
+    );
+    
+    let metadata = object::object_from_constructor_ref<Metadata>(constructor_ref);
+    
+    // Generate refs for minting and transferring
+    let mint_ref = fungible_asset::generate_mint_ref(constructor_ref);
+    let transfer_ref = fungible_asset::generate_transfer_ref(constructor_ref);
+    
+    // Store treasury capability
+    move_to(admin, TreasuryCapability {
+        metadata,
+        mint_ref,
+        transfer_ref,
+    });
+    
+    // Store treasury resource
+    move_to(admin, Treasury {
+        balances: aptos_framework::big_ordered_map::new(),
+        total_deposited: 0,
+        depositor_count: 0,
+    });
 }
 
 /// Deposit Aptos Coins to treasury
@@ -76,7 +119,7 @@ public entry fun deposit(
     treasury_addr: address,
     members_registry_addr: address,
     compliance_registry_addr: address,
-) acquires Treasury {
+) acquires Treasury, TreasuryCapability {
     assert!(amount > 0, error::invalid_argument(E_ZERO_AMOUNT));
     
     let depositor_addr = signer::address_of(depositor);
@@ -101,9 +144,23 @@ public entry fun deposit(
     assert!(exists<Treasury>(treasury_addr), error::not_found(E_NOT_INITIALIZED));
     let treasury = borrow_global_mut<Treasury>(treasury_addr);
     
-    // Transfer coins from depositor to treasury address
-    let coins = coin::withdraw<aptos_framework::aptos_coin::AptosCoin>(depositor, amount);
-    coin::deposit(treasury_addr, coins); // Hold in treasury account
+    // Transfer fungible assets from depositor to treasury address
+    let cap = borrow_global<TreasuryCapability>(treasury_addr);
+    let depositor_addr = signer::address_of(depositor);
+    
+    // Ensure primary store exists for depositor
+    let depositor_store = primary_fungible_store::ensure_primary_store_exists(depositor_addr, cap.metadata);
+    
+    // Check balance
+    let balance = primary_fungible_store::balance(depositor_addr, cap.metadata);
+    assert!(balance >= amount, error::invalid_state(E_INSUFFICIENT_BALANCE));
+    
+    // Withdraw from depositor
+    let asset = fungible_asset::withdraw_with_ref(&cap.transfer_ref, depositor_store, amount);
+    
+    // Ensure primary store exists for treasury and deposit
+    let treasury_store = primary_fungible_store::ensure_primary_store_exists(treasury_addr, cap.metadata);
+    fungible_asset::deposit(treasury_store, asset);
     
         // Update balance
         let is_new_depositor = !aptos_framework::big_ordered_map::contains(&treasury.balances, &depositor_addr);
@@ -143,7 +200,7 @@ public entry fun withdraw(
     admin: &signer,
     amount: u64,
     treasury_addr: address,
-) acquires Treasury {
+) acquires Treasury, TreasuryCapability {
     assert!(amount > 0, error::invalid_argument(E_ZERO_AMOUNT));
     
     let withdrawer_addr = signer::address_of(withdrawer);
@@ -164,13 +221,27 @@ public entry fun withdraw(
     aptos_framework::big_ordered_map::upsert(&mut treasury.balances, withdrawer_addr, balance - amount);
     treasury.total_deposited = treasury.total_deposited - amount;
     
-    // Transfer coins back from treasury to withdrawer
+    // Transfer fungible assets back from treasury to withdrawer
     // For MVP: treasury_addr must equal admin address to use admin signer
     let admin_addr = signer::address_of(admin);
     assert!(treasury_addr == admin_addr, error::invalid_argument(E_INVALID_REGISTRY));
     assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
-    let coins = coin::withdraw<aptos_framework::aptos_coin::AptosCoin>(admin, amount);
-    coin::deposit(withdrawer_addr, coins);
+    
+    let cap = borrow_global<TreasuryCapability>(treasury_addr);
+    
+    // Ensure primary store exists for treasury
+    let treasury_store = primary_fungible_store::ensure_primary_store_exists(treasury_addr, cap.metadata);
+    
+    // Check treasury balance
+    let treasury_balance = primary_fungible_store::balance(treasury_addr, cap.metadata);
+    assert!(treasury_balance >= amount, error::invalid_state(E_INSUFFICIENT_BALANCE));
+    
+    // Withdraw from treasury
+    let asset = fungible_asset::withdraw_with_ref(&cap.transfer_ref, treasury_store, amount);
+    
+    // Ensure primary store exists for withdrawer and deposit
+    let withdrawer_store = primary_fungible_store::ensure_primary_store_exists(withdrawer_addr, cap.metadata);
+    fungible_asset::deposit(withdrawer_store, asset);
 
     event::emit(WithdrawalEvent {
         withdrawer: withdrawer_addr,
@@ -197,7 +268,7 @@ public entry fun transfer_to_pool(
     amount: u64,
     pool_address: address,
     treasury_addr: address,
-) acquires Treasury {
+) acquires Treasury, TreasuryCapability {
     assert!(amount > 0, error::invalid_argument(E_ZERO_AMOUNT));
     
     let from_addr = signer::address_of(from);
@@ -218,12 +289,26 @@ public entry fun transfer_to_pool(
     aptos_framework::big_ordered_map::upsert(&mut treasury.balances, from_addr, balance - amount);
     treasury.total_deposited = treasury.total_deposited - amount;
     
-    // Transfer coins from treasury to pool address
+    // Transfer fungible assets from treasury to pool address
     // For MVP: treasury_addr must equal from address to use from signer
     assert!(treasury_addr == from_addr, error::invalid_argument(E_INVALID_REGISTRY));
     // Note: In production, would validate admin or use resource account
-    let coins = coin::withdraw<aptos_framework::aptos_coin::AptosCoin>(from, amount);
-    coin::deposit(pool_address, coins);
+    
+    let cap = borrow_global<TreasuryCapability>(treasury_addr);
+    
+    // Ensure primary store exists for treasury
+    let treasury_store = primary_fungible_store::ensure_primary_store_exists(treasury_addr, cap.metadata);
+    
+    // Check treasury balance
+    let treasury_balance = primary_fungible_store::balance(treasury_addr, cap.metadata);
+    assert!(treasury_balance >= amount, error::invalid_state(E_INSUFFICIENT_BALANCE));
+    
+    // Withdraw from treasury
+    let asset = fungible_asset::withdraw_with_ref(&cap.transfer_ref, treasury_store, amount);
+    
+    // Ensure primary store exists for pool and deposit
+    let pool_store = primary_fungible_store::ensure_primary_store_exists(pool_address, cap.metadata);
+    fungible_asset::deposit(pool_store, asset);
     
     event::emit(TransferToPoolEvent {
         from: from_addr,
@@ -242,6 +327,12 @@ public entry fun transfer_to_pool(
         option::none(),
         option::none(),
     );
+}
+
+/// Check if Treasury exists (view function for cross-module access)
+#[view]
+public fun exists_treasury(treasury_addr: address): bool {
+    exists<Treasury>(treasury_addr)
 }
 
 /// Get balance for an address (view function)
@@ -307,12 +398,36 @@ public fun list_top_depositors(treasury_addr: address, limit: u64): vector<Depos
     result
 }
 
-#[test_only]
-public fun initialize_for_test(admin: &signer) {
+/// Get asset metadata from treasury
+public fun get_asset_metadata(treasury_addr: address): Object<Metadata> acquires TreasuryCapability {
+    borrow_global<TreasuryCapability>(treasury_addr).metadata
+}
+
+/// Mint treasury fungible assets (admin/governance only)
+/// Requires admin capability at treasury_addr
+public fun mint(
+    admin: &signer,
+    to: address,
+    amount: u64,
+    treasury_addr: address,
+) acquires TreasuryCapability {
     let admin_addr = signer::address_of(admin);
-    if (!exists<Treasury>(admin_addr)) {
-        initialize(admin);
-    };
+    assert!(admin::has_admin_capability(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
+    assert!(exists<TreasuryCapability>(treasury_addr), error::not_found(E_NOT_INITIALIZED));
+    assert!(amount > 0, error::invalid_argument(E_ZERO_AMOUNT));
+    
+    let cap = borrow_global<TreasuryCapability>(treasury_addr);
+    
+    // Ensure primary store exists for recipient
+    primary_fungible_store::ensure_primary_store_exists(to, cap.metadata);
+    
+    // Mint assets directly to the store
+    primary_fungible_store::mint(&cap.mint_ref, to, amount);
+    
+    event::emit(MintedEvent {
+        to,
+        amount,
+    });
 }
 
 }

@@ -143,7 +143,9 @@ public fun initialize(admin: &signer) {
     // Explicit check for idempotency - no assert, just conditional creation
     if (!exists<PoolRegistry>(admin_addr)) {
         move_to(admin, PoolRegistry {
-            pools: aptos_framework::big_ordered_map::new(),
+            // Use new_with_type_size_hints because InvestmentPool contains nested BigOrderedMap fields
+            // Size calculation: 2 nested maps (~400 bytes) + other fields (~100 bytes) + overhead (~200 bytes) = ~500-800 bytes
+            pools: aptos_framework::big_ordered_map::new_with_type_size_hints<u64, InvestmentPool>(8, 8, 500, 2048),
             pool_counter: 0,
             pool_signer_caps: aptos_framework::big_ordered_map::new(),
         });
@@ -199,7 +201,8 @@ public entry fun create_pool(
     // Initialize if needed
     if (!exists<PoolRegistry>(admin_addr)) {
         move_to(admin, PoolRegistry {
-            pools: aptos_framework::big_ordered_map::new(),
+            // Use new_with_type_size_hints because InvestmentPool contains nested BigOrderedMap fields
+            pools: aptos_framework::big_ordered_map::new_with_type_size_hints<u64, InvestmentPool>(8, 8, 500, 2048),
             pool_counter: 0,
             pool_signer_caps: aptos_framework::big_ordered_map::new(),
         });
@@ -294,7 +297,8 @@ public entry fun create_pool_from_project(
     // Initialize pool registry if needed
     if (!exists<PoolRegistry>(pool_registry_addr)) {
         move_to(admin, PoolRegistry {
-            pools: aptos_framework::big_ordered_map::new(),
+            // Use new_with_type_size_hints because InvestmentPool contains nested BigOrderedMap fields
+            pools: aptos_framework::big_ordered_map::new_with_type_size_hints<u64, InvestmentPool>(8, 8, 500, 2048),
             pool_counter: 0,
             pool_signer_caps: aptos_framework::big_ordered_map::new(),
         });

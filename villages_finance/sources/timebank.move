@@ -88,7 +88,9 @@ public fun initialize(admin: &signer) {
     // Explicit check for idempotency - no assert, just conditional creation
     if (!exists<TimeBank>(admin_addr)) {
         move_to(admin, TimeBank {
-            requests: aptos_framework::big_ordered_map::new(),
+            // Use new_with_type_size_hints - Move 2.0 compiler may not statically infer constant size
+            // Size calculation: address (16) + 4 u64s (32) + enum (1) + overhead = ~50-100 bytes
+            requests: aptos_framework::big_ordered_map::new_with_type_size_hints<u64, ServiceRequest>(8, 8, 50, 200),
             request_counter: 0,
         });
     };

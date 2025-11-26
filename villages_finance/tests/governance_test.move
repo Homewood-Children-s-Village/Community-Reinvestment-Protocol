@@ -16,9 +16,17 @@ fun test_create_and_vote_simple(admin: signer, voter1: signer, voter2: signer) {
     members::initialize_for_test(&admin);
     let admin_addr = signer::address_of(&admin);
     
+    // Register admin as member (needed to create proposals) - idempotent check
+    if (!members::is_member_with_registry(admin_addr, admin_addr)) {
+        members::register_member(&admin, admin_addr, 1); // Admin role
+        members::accept_membership(&admin, admin_addr);
+    };
+    
     // Register voters as members
     members::register_member(&admin, signer::address_of(&voter1), 2); // Depositor
+    members::accept_membership(&voter1, admin_addr);
     members::register_member(&admin, signer::address_of(&voter2), 2); // Depositor
+    members::accept_membership(&voter2, admin_addr);
     
     // Initialize token
     let name = string::utf8(b"Test Token");
@@ -60,7 +68,15 @@ fun test_execute_proposal(admin: signer, voter1: signer) {
     members::initialize_for_test(&admin);
     let admin_addr = signer::address_of(&admin);
     
+    // Register admin as member (needed to create proposals) - idempotent check
+    if (!members::is_member_with_registry(admin_addr, admin_addr)) {
+        members::register_member(&admin, admin_addr, 1); // Admin role
+        members::accept_membership(&admin, admin_addr);
+    };
+    
+    // Register voter as member
     members::register_member(&admin, signer::address_of(&voter1), 2);
+    members::accept_membership(&voter1, admin_addr);
     
     let name = string::utf8(b"Test Token");
     let symbol = string::utf8(b"TEST");
@@ -89,7 +105,15 @@ fun test_double_vote(admin: signer, voter1: signer) {
     members::initialize_for_test(&admin);
     let admin_addr = signer::address_of(&admin);
     
+    // Register admin as member (needed to create proposals) - idempotent check
+    if (!members::is_member_with_registry(admin_addr, admin_addr)) {
+        members::register_member(&admin, admin_addr, 1); // Admin role
+        members::accept_membership(&admin, admin_addr);
+    };
+    
+    // Register voter as member
     members::register_member(&admin, signer::address_of(&voter1), 2);
+    members::accept_membership(&voter1, admin_addr);
     
     let name = string::utf8(b"Test Token");
     let symbol = string::utf8(b"TEST");

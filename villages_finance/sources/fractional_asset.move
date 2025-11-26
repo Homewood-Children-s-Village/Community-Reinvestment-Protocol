@@ -43,18 +43,20 @@ struct SharesTransferredEvent has drop, store {
 }
 
 /// Initialize fractional shares for a pool
+/// Idempotent: safe to call multiple times
 public fun initialize(
     admin: &signer,
     pool_id: u64,
 ) {
     let admin_addr = signer::address_of(admin);
-    assert!(!exists<FractionalShares>(admin_addr), error::already_exists(1));
-    
-    move_to(admin, FractionalShares {
-        pool_id,
-        shares: aptos_framework::big_ordered_map::new(),
-        total_shares: 0,
-    });
+    // Explicit check for idempotency - no assert, just conditional creation
+    if (!exists<FractionalShares>(admin_addr)) {
+        move_to(admin, FractionalShares {
+            pool_id,
+            shares: aptos_framework::big_ordered_map::new(), // address and u64 are fixed-size
+            total_shares: 0,
+        });
+    };
 }
 
 /// Mint shares (called by InvestmentPool)

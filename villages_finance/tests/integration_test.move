@@ -10,8 +10,6 @@ use villages_finance::project_registry;
 use villages_finance::treasury;
 use villages_finance::fractional_asset;
 use villages_finance::time_token;
-use aptos_framework::aptos_coin;
-use aptos_framework::coin;
 use aptos_framework::fungible_asset;
 use aptos_framework::primary_fungible_store;
 use std::signer;
@@ -37,8 +35,9 @@ fun test_cross_user_pool_operations(admin: signer, investor: signer) {
     // Whitelist investor
     compliance::whitelist_address(&admin, investor_addr);
     
-    // Register coins
-    coin::register<aptos_coin::AptosCoin>(&investor);
+    // Note: Coin registration commented out - this test doesn't actually use coins
+    // (join_pool is commented out)
+    // register_coin_for_test(&investor);
     
     // Admin creates pool (stored at admin_addr)
     let project_id = 1;
@@ -155,9 +154,19 @@ fun test_treasury_flow(admin: signer, depositor: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
     compliance::initialize_for_test(&admin);
-    treasury::initialize_for_test(&admin);
-    
     let admin_addr = signer::address_of(&admin);
+    
+    // Initialize treasury with FA metadata (same flow as production)
+    if (!treasury::exists_treasury(admin_addr)) {
+        treasury::initialize(
+            &admin,
+            b"Test Token",
+            b"TTK",
+            6, // decimals
+            b"Test token for treasury operations"
+        );
+    };
+    
     let depositor_addr = signer::address_of(&depositor);
     
     // Register depositor as member
@@ -167,8 +176,8 @@ fun test_treasury_flow(admin: signer, depositor: signer) {
     // Whitelist depositor
     compliance::whitelist_address(&admin, depositor_addr);
     
-    // Register coins
-    coin::register<aptos_coin::AptosCoin>(&depositor);
+    // Setup: Mint treasury assets for depositor (using production mint function)
+    treasury::mint(&admin, depositor_addr, 10000, admin_addr);
     
     // Depositor deposits to shared treasury (stored at admin_addr)
     let deposit_amount = 5000;

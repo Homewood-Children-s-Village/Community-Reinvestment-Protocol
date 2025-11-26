@@ -5,27 +5,37 @@ use villages_finance::treasury;
 use villages_finance::admin;
 use villages_finance::members;
 use villages_finance::compliance;
-use aptos_framework::coin;
-use aptos_framework::aptos_coin;
+use aptos_framework::fungible_asset;
 use std::signer;
+use std::string;
 
 #[test(admin = @0x1, user1 = @0x2)]
 fun test_initialize_and_deposit(admin: signer, user1: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
     compliance::initialize_for_test(&admin);
-    treasury::initialize_for_test(&admin);
     let admin_addr = signer::address_of(&admin);
+    
+    // Initialize treasury with FA metadata (same flow as production)
+    if (!treasury::exists_treasury(admin_addr)) {
+        treasury::initialize(
+            &admin,
+            b"Test Token",
+            b"TTK",
+            6, // decimals
+            b"Test token for treasury operations"
+        );
+    };
     
     // Register admin as member and whitelist
     members::accept_membership(&admin, admin_addr);
     compliance::whitelist_address(&admin, admin_addr);
     
-    // Setup: give admin some coins
-    coin::register<aptos_coin::AptosCoin>(&admin);
-    coin::register<aptos_coin::AptosCoin>(&user1);
+    // Setup: Mint treasury assets for depositor (using production mint function)
+    treasury::mint(&admin, signer::address_of(&admin), 10000, admin_addr);
+    treasury::mint(&admin, signer::address_of(&user1), 10000, admin_addr);
     
-    // Deposit 1000 coins
+    // Deposit 1000 fungible assets
     let amount = 1000;
     treasury::deposit(&admin, amount, admin_addr, admin_addr, admin_addr);
     
@@ -42,8 +52,18 @@ fun test_deposit_zero(admin: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
     compliance::initialize_for_test(&admin);
-    treasury::initialize_for_test(&admin);
     let admin_addr = signer::address_of(&admin);
+    
+    // Initialize treasury with FA metadata (same flow as production)
+    if (!treasury::exists_treasury(admin_addr)) {
+        treasury::initialize(
+            &admin,
+            b"Test Token",
+            b"TTK",
+            6, // decimals
+            b"Test token for treasury operations"
+        );
+    };
     members::accept_membership(&admin, admin_addr);
     compliance::whitelist_address(&admin, admin_addr);
     treasury::deposit(&admin, 0, admin_addr, admin_addr, admin_addr);
@@ -54,12 +74,24 @@ fun test_withdraw(admin: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
     compliance::initialize_for_test(&admin);
-    treasury::initialize_for_test(&admin);
     let admin_addr = signer::address_of(&admin);
+    
+    // Initialize treasury with FA metadata (same flow as production)
+    if (!treasury::exists_treasury(admin_addr)) {
+        treasury::initialize(
+            &admin,
+            b"Test Token",
+            b"TTK",
+            6, // decimals
+            b"Test token for treasury operations"
+        );
+    };
     
     members::accept_membership(&admin, admin_addr);
     compliance::whitelist_address(&admin, admin_addr);
-    coin::register<aptos_coin::AptosCoin>(&admin);
+    
+    // Setup: Mint treasury assets (using production mint function)
+    treasury::mint(&admin, admin_addr, 10000, admin_addr);
     
     // Deposit
     let deposit_amount = 1000;
@@ -79,11 +111,23 @@ fun test_withdraw_insufficient(admin: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
     compliance::initialize_for_test(&admin);
-    treasury::initialize_for_test(&admin);
     let admin_addr = signer::address_of(&admin);
+    
+    // Initialize treasury with FA metadata (same flow as production)
+    if (!treasury::exists_treasury(admin_addr)) {
+        treasury::initialize(
+            &admin,
+            b"Test Token",
+            b"TTK",
+            6, // decimals
+            b"Test token for treasury operations"
+        );
+    };
     members::accept_membership(&admin, admin_addr);
     compliance::whitelist_address(&admin, admin_addr);
-    coin::register<aptos_coin::AptosCoin>(&admin);
+    
+    // Setup: Mint treasury assets (using production mint function)
+    treasury::mint(&admin, admin_addr, 10000, admin_addr);
     
     treasury::deposit(&admin, 100, admin_addr, admin_addr, admin_addr);
     // Updated: add admin parameter
@@ -95,12 +139,24 @@ fun test_transfer_to_pool(admin: signer) {
     admin::initialize_for_test(&admin);
     members::initialize_for_test(&admin);
     compliance::initialize_for_test(&admin);
-    treasury::initialize_for_test(&admin);
     let admin_addr = signer::address_of(&admin);
+    
+    // Initialize treasury with FA metadata (same flow as production)
+    if (!treasury::exists_treasury(admin_addr)) {
+        treasury::initialize(
+            &admin,
+            b"Test Token",
+            b"TTK",
+            6, // decimals
+            b"Test token for treasury operations"
+        );
+    };
     
     members::accept_membership(&admin, admin_addr);
     compliance::whitelist_address(&admin, admin_addr);
-    coin::register<aptos_coin::AptosCoin>(&admin);
+    
+    // Setup: Mint treasury assets (using production mint function)
+    treasury::mint(&admin, admin_addr, 10000, admin_addr);
     
     treasury::deposit(&admin, 1000, admin_addr, admin_addr, admin_addr);
     

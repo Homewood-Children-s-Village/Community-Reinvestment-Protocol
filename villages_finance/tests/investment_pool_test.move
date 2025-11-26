@@ -29,8 +29,9 @@ fun test_create_and_join_pool(admin: signer, borrower: signer, investor: signer)
     // Register and whitelist investor
     compliance::whitelist_address(&admin, investor_addr);
     
-    // Register coins for investor
-    coin::register<aptos_coin::AptosCoin>(&investor);
+    // Note: Coin registration commented out - this test doesn't actually use coins
+    // (join_pool is commented out)
+    // coin::register<aptos_coin::AptosCoin>(&investor);
     
     // Create pool
     let project_id = 1;
@@ -67,7 +68,8 @@ fun test_finalize_funding(admin: signer, borrower: signer) {
     let admin_addr = signer::address_of(&admin);
     let borrower_addr = signer::address_of(&borrower);
     
-    coin::register<aptos_coin::AptosCoin>(&admin);
+    // Note: Coin registration commented out - this test doesn't actually use coins
+    // coin::register<aptos_coin::AptosCoin>(&admin);
     compliance::whitelist_address(&admin, admin_addr);
     
     investment_pool::create_pool(&admin, 1, 5000, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
@@ -94,7 +96,9 @@ fun test_repay_loan(admin: signer, borrower: signer) {
     let admin_addr = signer::address_of(&admin);
     let borrower_addr = signer::address_of(&borrower);
     
-    coin::register<aptos_coin::AptosCoin>(&borrower);
+    // Note: Coin registration commented out - this test doesn't actually use coins
+    // (repay_loan is commented out)
+    // coin::register<aptos_coin::AptosCoin>(&borrower);
     
     investment_pool::create_pool(&admin, 1, 5000, 500, 86400, borrower_addr, admin_addr, admin_addr, admin_addr, admin_addr);
     
@@ -139,11 +143,12 @@ fun test_repayment_rounding_all_funds_claimable(admin: signer, borrower: signer,
     let investor1_addr = signer::address_of(&investor1);
     let investor2_addr = signer::address_of(&investor2);
     
-    // Register coins
-    coin::register<aptos_coin::AptosCoin>(&admin);
-    coin::register<aptos_coin::AptosCoin>(&borrower);
-    coin::register<aptos_coin::AptosCoin>(&investor1);
-    coin::register<aptos_coin::AptosCoin>(&investor2);
+    // Note: Coin registration commented out - this test doesn't actually use coins
+    // (join_pool and repay_loan are commented out)
+    // coin::register<aptos_coin::AptosCoin>(&admin);
+    // coin::register<aptos_coin::AptosCoin>(&borrower);
+    // coin::register<aptos_coin::AptosCoin>(&investor1);
+    // coin::register<aptos_coin::AptosCoin>(&investor2);
     
     // Register and whitelist investors
     members::register_member(&admin, investor1_addr, 2);
