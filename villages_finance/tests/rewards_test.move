@@ -79,7 +79,7 @@ fun test_unstake_partial(admin: signer, user1: signer) {
 }
 
 #[test(admin = @0x1, user1 = @0x2)]
-#[expected_failure(abort_code = 65539, location = rewards)]
+#[expected_failure(abort_code = 196614, location = rewards)]
 fun test_unstake_insufficient_balance(admin: signer, user1: signer) {
     admin::initialize_for_test(&admin);
     ensure_token_initialized(&admin);
@@ -95,12 +95,9 @@ fun test_unstake_insufficient_balance(admin: signer, user1: signer) {
     rewards::update_reward_debt(user1_addr, pool_id, 100, admin_addr);
     
     // Try to unstake more than staked - should fail
-    // Note: This requires actual coins in pool for full test
-    // rewards::unstake(&user1, &admin, pool_id, 200, admin_addr);
-    
-    // For now, verify staked amount
-    let staked = rewards::get_staked_amount(user1_addr, pool_id, admin_addr);
-    assert!(staked == 100, 0);
+    // Note: This requires actual coins in pool, but the insufficient balance check happens before withdrawal
+    // So we can test the validation without coins
+    rewards::unstake(&user1, &admin, pool_id, 200, admin_addr);
 }
 
 #[test(admin = @0x1, user1 = @0x2, user2 = @0x3)]
@@ -132,7 +129,7 @@ fun test_unstake_multiple_users(admin: signer, user1: signer, user2: signer) {
 }
 
 #[test(admin = @0x1, user1 = @0x2)]
-#[expected_failure(abort_code = 65538, location = rewards)]
+#[expected_failure(abort_code = 65539, location = rewards)]
 fun test_unstake_zero_amount(admin: signer, user1: signer) {
     admin::initialize_for_test(&admin);
     ensure_token_initialized(&admin);
@@ -146,9 +143,9 @@ fun test_unstake_zero_amount(admin: signer, user1: signer) {
     
     rewards::update_reward_debt(user1_addr, pool_id, 100, admin_addr);
     
-    // Try to unstake zero - should fail
-    // Note: Requires coins in pool for full test
-    // rewards::unstake(&user1, &admin, pool_id, 0, admin_addr);
+    // Try to unstake zero - should fail (validation happens before any other checks)
+    // This will fail at the zero-amount check, so we don't need coins in pool
+    rewards::unstake(&user1, &admin, pool_id, 0, admin_addr);
 }
 
 #[test(admin = @0x1, user1 = @0x2)]

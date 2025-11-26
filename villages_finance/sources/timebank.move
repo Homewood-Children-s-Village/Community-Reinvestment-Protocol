@@ -21,6 +21,7 @@ const E_ZERO_HOURS: u64 = 5;
 const E_NOT_MEMBER: u64 = 6;
 const E_INVALID_REGISTRY: u64 = 7;
 const E_NOT_AUTHORIZED: u64 = 8;
+const E_ZERO_AMOUNT: u64 = 9;
 
 /// Service request status
 public enum RequestStatus has copy, drop, store {
@@ -356,17 +357,21 @@ public entry fun bulk_approve_requests(
     members_registry_addr: address,
     time_token_admin_addr: address,
 ) acquires TimeBank {
+    // Input validation first
+    let batch_size = vector::length(&request_ids);
+    assert!(batch_size > 0, error::invalid_argument(E_ZERO_AMOUNT));
+    assert!(batch_size <= 50, error::invalid_argument(2)); // Limit batch size
+    
     let validator_addr = signer::address_of(validator);
     
     // Validate registry exists
     assert!(exists<TimeBank>(bank_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
+    
+    // Check permissions after input validation
     assert!(members::has_role_with_registry(validator_addr, members::validator_role_u8(), members_registry_addr), 
         error::permission_denied(E_NOT_VALIDATOR));
     
     let bank = borrow_global_mut<TimeBank>(bank_registry_addr);
-    let batch_size = vector::length(&request_ids);
-    assert!(batch_size > 0, error::invalid_argument(1));
-    assert!(batch_size <= 50, error::invalid_argument(2)); // Limit batch size
     
     let approved_count = 0;
     let failed_ids = vector::empty<u64>();
@@ -375,13 +380,18 @@ public entry fun bulk_approve_requests(
     while (i < batch_size) {
         let request_id = *vector::borrow(&request_ids, i);
         if (aptos_framework::big_ordered_map::contains(&bank.requests, &request_id)) {
-            let request = aptos_framework::big_ordered_map::borrow_mut(&mut bank.requests, &request_id);
+            // Use remove-modify-insert pattern because ServiceRequest contains variable-sized fields
+            let request = aptos_framework::big_ordered_map::remove(&mut bank.requests, &request_id);
+            
             if (request.status is RequestStatus::Pending) {
                 // Store values before modifying
                 let requester_addr = request.requester;
                 let hours = request.hours;
                 
                 request.status = RequestStatus::Approved;
+                
+                // Re-insert request
+                aptos_framework::big_ordered_map::add(&mut bank.requests, request_id, request);
                 
                 // Mint Time Tokens using FA standard
                 time_token::mint(validator, requester_addr, hours, time_token_admin_addr);
@@ -406,6 +416,8 @@ public entry fun bulk_approve_requests(
                 
                 approved_count = approved_count + 1;
             } else {
+                // Re-insert request even if not approved (status unchanged)
+                aptos_framework::big_ordered_map::add(&mut bank.requests, request_id, request);
                 vector::push_back(&mut failed_ids, request_id);
             };
         } else {
@@ -425,17 +437,21 @@ public entry fun bulk_reject_requests(
     bank_registry_addr: address,
     members_registry_addr: address,
 ) acquires TimeBank {
+    // Input validation first
+    let batch_size = vector::length(&request_ids);
+    assert!(batch_size > 0, error::invalid_argument(E_ZERO_AMOUNT));
+    assert!(batch_size <= 50, error::invalid_argument(2)); // Limit batch size
+    
     let validator_addr = signer::address_of(validator);
     
     // Validate registry exists
     assert!(exists<TimeBank>(bank_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
+    
+    // Check permissions after input validation
     assert!(members::has_role_with_registry(validator_addr, members::validator_role_u8(), members_registry_addr), 
         error::permission_denied(E_NOT_VALIDATOR));
     
     let bank = borrow_global_mut<TimeBank>(bank_registry_addr);
-    let batch_size = vector::length(&request_ids);
-    assert!(batch_size > 0, error::invalid_argument(1));
-    assert!(batch_size <= 50, error::invalid_argument(2)); // Limit batch size
     
     let rejected_count = 0;
     let failed_ids = vector::empty<u64>();
@@ -559,6 +575,7 @@ public entry fun update_request(
     bank_registry_addr: address,
     members_registry_addr: address,
 ) acquires TimeBank {
+    // Input validation first
     assert!(new_hours > 0, error::invalid_argument(E_ZERO_HOURS));
     
     let requester_addr = signer::address_of(requester);
@@ -570,13 +587,13 @@ public entry fun update_request(
     // Verify requester is a member
     assert!(members::is_member_with_registry(requester_addr, members_registry_addr), error::permission_denied(E_NOT_MEMBER));
     
-    assert!(exists<TimeBank>(bank_registry_addr), error::not_found(E_NOT_INITIALIZED));
     let bank = borrow_global_mut<TimeBank>(bank_registry_addr);
     
     assert!(aptos_framework::big_ordered_map::contains(&bank.requests, &request_id),
         error::not_found(E_REQUEST_NOT_FOUND));
     
-    let request = aptos_framework::big_ordered_map::borrow_mut(&mut bank.requests, &request_id);
+    // Use remove-modify-insert pattern because ServiceRequest contains variable-sized fields
+    let request = aptos_framework::big_ordered_map::remove(&mut bank.requests, &request_id);
     
     // Verify requester owns this request
     assert!(request.requester == requester_addr, error::permission_denied(E_NOT_AUTHORIZED));
@@ -586,6 +603,9 @@ public entry fun update_request(
     
     let old_hours = request.hours;
     request.hours = new_hours;
+    
+    // Re-insert request
+    aptos_framework::big_ordered_map::add(&mut bank.requests, request_id, request);
     
     event::emit(RequestUpdatedEvent {
         request_id,

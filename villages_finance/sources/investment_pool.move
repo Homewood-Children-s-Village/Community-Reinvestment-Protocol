@@ -345,6 +345,7 @@ public entry fun join_pool(
     amount: u64,
     registry_addr: address,
 ) acquires PoolRegistry {
+    // Input validation first
     assert!(amount > 0, error::invalid_argument(E_ZERO_AMOUNT));
     
     // Validate registry exists
@@ -352,12 +353,14 @@ public entry fun join_pool(
     
     let investor_addr = signer::address_of(investor);
     
-    assert!(exists<PoolRegistry>(registry_addr), error::not_found(E_NOT_INITIALIZED));
     let registry = borrow_global_mut<PoolRegistry>(registry_addr);
     assert!(aptos_framework::big_ordered_map::contains(&registry.pools, &pool_id), 
         error::not_found(E_POOL_NOT_FOUND));
     
-    let pool = aptos_framework::big_ordered_map::borrow_mut(&mut registry.pools, &pool_id);
+    // Use remove-modify-insert pattern because InvestmentPool contains nested BigOrderedMap
+    let pool = aptos_framework::big_ordered_map::remove(&mut registry.pools, &pool_id);
+    
+    // Validate pool status
     assert!((pool.status is PoolStatus::Pending) || (pool.status is PoolStatus::Active), 
         error::invalid_state(E_INVALID_STATUS));
     
@@ -392,8 +395,14 @@ public entry fun join_pool(
     pool.current_total = pool.current_total + amount;
     pool.status = PoolStatus::Active;
     
+    // Extract fractional_shares_addr before moving pool into the map
+    let fractional_shares_addr = pool.fractional_shares_addr;
+    
+    // Re-insert pool using add (will overwrite if exists, but we just removed it)
+    aptos_framework::big_ordered_map::add(&mut registry.pools, pool_id, pool);
+    
     // Mint fractional shares
-    fractional_asset::mint_shares(investor, pool_id, investor_addr, amount, pool.fractional_shares_addr);
+    fractional_asset::mint_shares(investor, pool_id, investor_addr, amount, fractional_shares_addr);
 
     event::emit(InvestmentCommittedEvent {
         pool_id,
@@ -624,7 +633,10 @@ public entry fun claim_repayment(
     assert!(aptos_framework::big_ordered_map::contains(&registry.pools, &pool_id), 
         error::not_found(E_POOL_NOT_FOUND));
     
-    let pool = aptos_framework::big_ordered_map::borrow_mut(&mut registry.pools, &pool_id);
+    // Use remove-modify-insert pattern because InvestmentPool contains nested BigOrderedMap
+    let pool = aptos_framework::big_ordered_map::remove(&mut registry.pools, &pool_id);
+    
+    // Validate pool status
     assert!(pool.status is PoolStatus::Completed, error::invalid_state(E_INVALID_STATUS));
     assert!(pool.total_repayment > 0, error::invalid_state(E_NO_REPAYMENT_AVAILABLE));
     
@@ -633,9 +645,11 @@ public entry fun claim_repayment(
         error::not_found(E_POOL_NOT_FOUND));
     
     // Check not already claimed
-    assert!(!aptos_framework::big_ordered_map::contains(&pool.repayment_claimed, &investor_addr) ||
+    assert!(
+        !aptos_framework::big_ordered_map::contains(&pool.repayment_claimed, &investor_addr) ||
         !*aptos_framework::big_ordered_map::borrow(&pool.repayment_claimed, &investor_addr),
-        error::already_exists(E_REPAYMENT_ALREADY_CLAIMED));
+        error::already_exists(E_REPAYMENT_ALREADY_CLAIMED)
+    );
     
     // Calculate investor's share: (contribution / total_contributed) * total_repayment
     let contribution = *aptos_framework::big_ordered_map::borrow(&pool.contributions, &investor_addr);
@@ -671,6 +685,9 @@ public entry fun claim_repayment(
     
     // Mark as claimed
     aptos_framework::big_ordered_map::upsert(&mut pool.repayment_claimed, investor_addr, true);
+    
+    // Re-insert pool
+    aptos_framework::big_ordered_map::add(&mut registry.pools, pool_id, pool);
 
     event::emit(RepaymentClaimedEvent {
         pool_id,

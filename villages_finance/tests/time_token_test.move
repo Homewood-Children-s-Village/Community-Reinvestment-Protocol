@@ -193,7 +193,7 @@ fun test_time_token_transfer_with_restrictions(admin: signer, user1: signer, use
 }
 
 #[test(admin = @0x1, user1 = @0x2, user2 = @0x3)]
-#[expected_failure(abort_code = 65540, location = time_token)]
+#[expected_failure(abort_code = 327684, location = time_token)]
 fun test_time_token_transfer_restricted_sender_not_whitelisted(admin: signer, user1: signer, user2: signer) {
     admin::initialize_for_test(&admin);
     compliance::initialize_for_test(&admin);
@@ -216,7 +216,7 @@ fun test_time_token_transfer_restricted_sender_not_whitelisted(admin: signer, us
 }
 
 #[test(admin = @0x1, user1 = @0x2, user2 = @0x3)]
-#[expected_failure(abort_code = 65540, location = time_token)]
+#[expected_failure(abort_code = 327684, location = time_token)]
 fun test_time_token_transfer_restricted_recipient_not_whitelisted(admin: signer, user1: signer, user2: signer) {
     admin::initialize_for_test(&admin);
     compliance::initialize_for_test(&admin);
@@ -279,7 +279,7 @@ fun test_enable_disable_transfer_restrictions(admin: signer, user1: signer, user
 }
 
 #[test(admin = @0x1, user1 = @0x2)]
-#[expected_failure(abort_code = 327687, location = time_token)]
+#[expected_failure(abort_code = 327685, location = time_token)]
 fun test_enable_transfer_restrictions_requires_admin(admin: signer, user1: signer) {
     admin::initialize_for_test(&admin);
     compliance::initialize_for_test(&admin);

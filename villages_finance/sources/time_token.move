@@ -162,7 +162,7 @@ public fun burn(
     
     // Check balance
     let balance = primary_fungible_store::balance(burner_addr, cap.metadata);
-    assert!(balance >= hours, error::invalid_state(E_INSUFFICIENT_BALANCE));
+    assert!(balance >= hours, error::invalid_argument(E_INSUFFICIENT_BALANCE));
     
     // Withdraw from primary store and burn
     let asset = fungible_asset::withdraw_with_ref(&cap.transfer_ref, store, hours);
@@ -201,6 +201,7 @@ public entry fun transfer(
     hours: u64,
     admin_addr: address,
 ) acquires MintCapability, TransferConfig {
+    // Input validation first
     assert!(hours > 0, error::invalid_argument(E_ZERO_AMOUNT));
     
     let sender_addr = signer::address_of(sender);
@@ -208,35 +209,37 @@ public entry fun transfer(
     // Check if MintCapability exists
     assert!(exists<MintCapability>(admin_addr), error::permission_denied(E_NOT_AUTHORIZED));
     
-    // Check transfer restrictions if enabled
+    let cap = borrow_global<MintCapability>(admin_addr);
+    
+    // Ensure primary store exists for sender and check balance early
+    let sender_store = primary_fungible_store::ensure_primary_store_exists(sender_addr, cap.metadata);
+    let balance = primary_fungible_store::balance(sender_addr, cap.metadata);
+    assert!(balance >= hours, error::invalid_argument(E_INSUFFICIENT_BALANCE));
+    
+    // Check transfer restrictions if enabled (after balance check)
     if (exists<TransferConfig>(admin_addr)) {
         let config = borrow_global<TransferConfig>(admin_addr);
         if (config.transfer_restricted) {
             // Both sender and recipient must be whitelisted
-            assert!(
-                option::is_some(&config.compliance_registry_addr),
-                error::invalid_argument(E_INVALID_REGISTRY)
-            );
-            let compliance_registry_addr = *option::borrow(&config.compliance_registry_addr);
-            assert!(
-                compliance::is_whitelisted(sender_addr, compliance_registry_addr),
-                error::permission_denied(E_TRANSFER_RESTRICTED)
-            );
-            assert!(
-                compliance::is_whitelisted(recipient, compliance_registry_addr),
-                error::permission_denied(E_TRANSFER_RESTRICTED)
-            );
+            // Check registry exists first, but prioritize whitelist checks for better error messages
+            if (option::is_some(&config.compliance_registry_addr)) {
+                let compliance_registry_addr = *option::borrow(&config.compliance_registry_addr);
+                // Check sender whitelist first (most specific check)
+                assert!(
+                    compliance::is_whitelisted(sender_addr, compliance_registry_addr),
+                    error::permission_denied(E_TRANSFER_RESTRICTED)
+                );
+                // Then check recipient whitelist
+                assert!(
+                    compliance::is_whitelisted(recipient, compliance_registry_addr),
+                    error::permission_denied(E_TRANSFER_RESTRICTED)
+                );
+            } else {
+                // Registry not configured - this should not happen if restrictions are enabled properly
+                abort error::invalid_argument(E_INVALID_REGISTRY);
+            };
         };
     };
-    
-    let cap = borrow_global<MintCapability>(admin_addr);
-    
-    // Ensure primary store exists for sender
-    let sender_store = primary_fungible_store::ensure_primary_store_exists(sender_addr, cap.metadata);
-    
-    // Check balance
-    let balance = primary_fungible_store::balance(sender_addr, cap.metadata);
-    assert!(balance >= hours, error::invalid_state(E_INSUFFICIENT_BALANCE));
     
     // Withdraw from sender's primary store
     let asset = fungible_asset::withdraw_with_ref(&cap.transfer_ref, sender_store, hours);
@@ -260,6 +263,7 @@ public entry fun enable_transfer_restrictions(
     admin_addr: address,
 ) acquires TransferConfig {
     let admin_addr_check = signer::address_of(admin);
+    // Check admin capability first - use admin module's error code for consistency
     assert!(admin::has_admin_capability(admin_addr_check), error::permission_denied(E_NOT_ADMIN));
     assert!(exists<TransferConfig>(admin_addr), error::not_found(E_NOT_AUTHORIZED));
     assert!(compliance::exists_compliance_registry(compliance_registry_addr), error::invalid_argument(E_INVALID_REGISTRY));
