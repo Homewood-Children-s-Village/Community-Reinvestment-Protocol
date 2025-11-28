@@ -181,7 +181,7 @@ Some documentation comments are flagged as invalid. These are view functions tha
 The code uses Move 2.4-unstable features (visibility modifiers on structs). Ensure your `Move.toml` specifies the correct version:
 ```toml
 [package]
-edition = "2024.beta"
+edition = "2025.beta"
 ```
 
 ## Testing Recommendations

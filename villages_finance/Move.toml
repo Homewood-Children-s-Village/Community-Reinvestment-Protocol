@@ -3,7 +3,7 @@ name = "villages_finance"
 version = "1.0.0"
 
 [addresses]
-villages_finance = "0x123"
+villages_finance = "0x2144ec184b89cf405e430d375b3de991ae14baf26cb6ec9987ea57922c0f1c5b"
 
 
 [dependencies.AptosFramework]

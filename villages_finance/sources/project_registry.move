@@ -71,7 +71,7 @@ struct ProjectStatusUpdatedEvent has drop, store {
 /// Initialize project registry
 /// Idempotent: safe to call multiple times
 /// Note: Uses new_with_type_size_hints because Project contains vector<u8> (variable-sized)
-public fun initialize(admin: &signer) {
+public entry fun initialize(admin: &signer) {
     let admin_addr = signer::address_of(admin);
     // Explicit check for idempotency - no assert, just conditional creation
     if (!exists<ProjectRegistry>(admin_addr)) {

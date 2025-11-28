@@ -1,0 +1,187 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Design system colors from UX/UI spec */
+    --color-primary: 94 63 163;
+    --color-primary-foreground: 255 255 255;
+    --color-secondary: 0 160 166;
+    --color-secondary-foreground: 255 255 255;
+    --color-success: 76 175 80;
+    --color-success-foreground: 255 255 255;
+    --color-error: 229 57 53;
+    --color-error-foreground: 255 255 255;
+    --color-warning: 255 179 0;
+    --color-warning-foreground: 51 51 51;
+    --color-background: 248 248 248;
+    --color-surface: 255 255 255;
+    --color-text: 51 51 51;
+    --color-text-muted: 119 119 119;
+    --color-border: 204 204 204;
+
+    /* shadcn/ui compatible tokens */
+    --background: 248 248 248;
+    --foreground: 51 51 51;
+    --card: 255 255 255;
+    --card-foreground: 51 51 51;
+    --popover: 255 255 255;
+    --popover-foreground: 51 51 51;
+    --primary: 94 63 163;
+    --primary-foreground: 255 255 255;
+    --secondary: 0 160 166;
+    --secondary-foreground: 255 255 255;
+    --muted: 248 248 248;
+    --muted-foreground: 119 119 119;
+    --accent: 0 160 166;
+    --accent-foreground: 255 255 255;
+    --destructive: 229 57 53;
+    --destructive-foreground: 255 255 255;
+    --border: 204 204 204;
+    --input: 204 204 204;
+    --ring: 94 63 163;
+    --radius: 8px;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-text;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  /* Typography */
+  h1 {
+    @apply text-h1;
+  }
+  h2 {
+    @apply text-h2;
+  }
+  h3 {
+    @apply text-h3;
+  }
+  p {
+    @apply text-body;
+  }
+  
+  /* Focus styles for accessibility */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2;
+  }
+}
+
+@layer utilities {
+  /* Custom animations */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Container utility */
+  .container-app {
+    @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+  
+  /* Card hover effect */
+  .card-interactive {
+    @apply transition-all duration-200 hover:shadow-card-hover hover:-translate-y-0.5;
+  }
+  
+  /* Gradient backgrounds */
+  .gradient-primary {
+    background: linear-gradient(135deg, #5E3FA3 0%, #7B5BBF 100%);
+  }
+  
+  .gradient-secondary {
+    background: linear-gradient(135deg, #00A0A6 0%, #00C4CC 100%);
+  }
+  
+  .gradient-hero {
+    background: linear-gradient(135deg, #5E3FA3 0%, #00A0A6 100%);
+  }
+  
+  /* Text truncation */
+  .truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .truncate-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+

@@ -52,7 +52,7 @@ struct ParameterUpdatedEvent has drop, store {
 }
 
 /// Initialize parameter registry
-public fun initialize(admin: &signer) {
+public entry fun initialize(admin: &signer) {
     let admin_addr = signer::address_of(admin);
     assert!(!exists<ParameterRegistry>(admin_addr), error::already_exists(1));
     

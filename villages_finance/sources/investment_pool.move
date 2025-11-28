@@ -138,7 +138,7 @@ struct PoolRegistry has key {
 /// Initialize pool registry
 /// Initialize pool registry
 /// Idempotent: safe to call multiple times
-public fun initialize(admin: &signer) {
+public entry fun initialize(admin: &signer) {
     let admin_addr = signer::address_of(admin);
     // Explicit check for idempotency - no assert, just conditional creation
     if (!exists<PoolRegistry>(admin_addr)) {
